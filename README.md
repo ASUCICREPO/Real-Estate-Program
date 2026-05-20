@@ -1,6 +1,6 @@
-# [INSERT_PROJECT_NAME]
+# W. P. Carey Real Estate Program — AI Presentation Analyzer
 
-[INSERT_PROJECT_DESCRIPTION - 2-3 sentences describing what the project does, who it's for, and the key problem it solves]
+An AI-powered experiential learning platform for the W. P. Carey School of Business at Arizona State University. The platform evaluates student presentations through the lens of different stakeholder personas (investors, public officials, prosecutors, negotiation counterparts) and provides actionable, role-specific feedback on presentation delivery, negotiation tactics, and strategic communication.
 
 ---
 
@@ -60,17 +60,9 @@ All work produced is open source. More information can be found in the GitHub re
 
 ## High Level Architecture
 
-[INSERT_ARCHITECTURE_OVERVIEW - Brief paragraph explaining the architecture, how components interact, and the overall system design]
+The platform uses a serverless AWS architecture. Students interact through a Next.js frontend hosted on AWS Amplify, authenticated via Amazon Cognito. API Gateway routes requests to Lambda functions handling persona management (CRUD), content analysis & question generation, post-meeting analytics, and S3 presigned URL generation. Live Q&A and negotiation simulations run on Bedrock AgentCore using Nova 2 Sonic for bidirectional voice. Persona definitions are stored in DynamoDB; session data (uploads, recordings, transcripts) lives in S3 with a 30-day lifecycle. Bedrock Guardrails filter all AI interactions for content safety and PII protection. Client-side gaze detection (MediaPipe) and Amazon Transcribe provide real-time presentation metrics.
 
 ![Architecture Diagram](./docs/media/architecture.png)
-
-> **[PLACEHOLDER]** Please create and provide an architecture diagram showing:
-> - All major components/services
-> - Data flow between components
-> - User interaction points
-> - External services/APIs
-> 
-> Save the diagram as `docs/media/architecture.png` (or .jpeg/.jpg)
 
 For a detailed explanation of the architecture and architectural decisions, see the [Architecture Deep Dive](./docs/architectureDeepDive.md).
 
