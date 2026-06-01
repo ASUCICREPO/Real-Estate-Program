@@ -342,15 +342,15 @@ export class RealEstateProgramStack extends cdk.Stack {
     const guardrail = new bedrock.CfnGuardrail(this, 'ContentGuardrail', {
       name: `RealEstateGuardrail-${suffix}`,
       description: 'Content safety guardrail for AI interactions — filters harmful content, PII, and prompt injection.',
-      blockedInputMessaging: 'Your input was flagged by our safety filters. Please rephrase and try again.',
-      blockedOutputsMessaging: 'The AI response was blocked by safety filters. Please modify your request.',
+      blockedInputMessaging: "Let's keep our discussion focused on the real estate project. Could you rephrase that?",
+      blockedOutputsMessaging: "Let me rephrase. Let's stay focused on your presentation.",
       contentPolicyConfig: {
         filtersConfig: [
-          { type: 'HATE', inputStrength: 'HIGH', outputStrength: 'HIGH' },
-          { type: 'INSULTS', inputStrength: 'HIGH', outputStrength: 'HIGH' },
+          { type: 'HATE', inputStrength: 'HIGH', outputStrength: 'MEDIUM' },
+          { type: 'INSULTS', inputStrength: 'MEDIUM', outputStrength: 'NONE' },
           { type: 'SEXUAL', inputStrength: 'HIGH', outputStrength: 'HIGH' },
-          { type: 'VIOLENCE', inputStrength: 'HIGH', outputStrength: 'HIGH' },
-          { type: 'MISCONDUCT', inputStrength: 'HIGH', outputStrength: 'HIGH' },
+          { type: 'VIOLENCE', inputStrength: 'MEDIUM', outputStrength: 'NONE' },
+          { type: 'MISCONDUCT', inputStrength: 'MEDIUM', outputStrength: 'NONE' },
           { type: 'PROMPT_ATTACK', inputStrength: 'HIGH', outputStrength: 'NONE' },
         ],
       },
