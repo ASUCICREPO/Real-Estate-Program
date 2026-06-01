@@ -99,9 +99,9 @@ export default function NoteCardExercise({ onExit }: NoteCardExerciseProps) {
         setPart1Score(Math.round((correct / CORRECT_SEQUENCE.length) * 100));
         setPhase('part2');
         setTimeLeft(300);
-        // Initialize task assignment buckets for the sequenced professionals
+        // Initialize task assignment buckets only for the professionals the student sequenced
         const buckets: Record<string, string[]> = {};
-        CORRECT_SEQUENCE.forEach(p => { buckets[p] = []; });
+        sequenceSlots.forEach(p => { buckets[p] = []; });
         setTaskAssignments(buckets);
     }, [sequenceSlots]);
 
@@ -223,7 +223,7 @@ export default function NoteCardExercise({ onExit }: NoteCardExerciseProps) {
                         </span>
                         <button
                             onClick={handlePart1Complete}
-                            disabled={sequenceSlots.length < PROFESSIONALS.length}
+                            disabled={sequenceSlots.length === 0}
                             className="rounded-lg bg-maroon-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-maroon-700 disabled:opacity-40 disabled:cursor-not-allowed font-sans 2xl:px-5 2xl:py-2.5 2xl:text-sm"
                         >
                             Continue to Part 2 →
@@ -296,7 +296,7 @@ export default function NoteCardExercise({ onExit }: NoteCardExerciseProps) {
                         </span>
                         <button
                             onClick={handlePart2Complete}
-                            disabled={availableTasks.length > 0}
+                            disabled={Object.values(taskAssignments).every(t => t.length === 0)}
                             className="rounded-lg bg-maroon-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-maroon-700 disabled:opacity-40 disabled:cursor-not-allowed font-sans 2xl:px-5 2xl:py-2.5 2xl:text-sm"
                         >
                             See Results ✨
@@ -310,7 +310,7 @@ export default function NoteCardExercise({ onExit }: NoteCardExerciseProps) {
 
                 {/* Professional drop zones */}
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:gap-6">
-                    {CORRECT_SEQUENCE.map(prof => (
+                    {sequenceSlots.map(prof => (
                         <div key={prof} className="rounded-xl border border-gray-200 bg-white p-4 2xl:p-5">
                             <p className="mb-2 text-sm font-semibold text-maroon-700 font-sans 2xl:text-base">{prof}</p>
                             <div className="min-h-[50px] rounded-lg border border-dashed border-gray-200 bg-gray-50 p-2 space-y-1.5">
@@ -344,7 +344,7 @@ export default function NoteCardExercise({ onExit }: NoteCardExerciseProps) {
                                     {task}
                                     {/* Assign dropdown on click */}
                                     <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-10 w-48 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
-                                        {CORRECT_SEQUENCE.map(prof => (
+                                        {sequenceSlots.map(prof => (
                                             <button
                                                 key={prof}
                                                 onClick={() => handleAssignTask(task, prof)}
