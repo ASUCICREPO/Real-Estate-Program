@@ -70,7 +70,7 @@ def list_personas(headers):
         # Strip personaPrompt from list view for brevity
         for item in items:
             item.pop('personaPrompt', None)
-        return response(200, items, headers)
+        return response(200, {'personas': items}, headers)
     except ClientError as e:
         logger.error(f'DynamoDB error: {e}')
         return response(500, {'error': 'Failed to list personas'}, headers)

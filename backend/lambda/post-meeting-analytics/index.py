@@ -1,202 +1,586 @@
-"""Post Meeting Analytics Lambda — generates separate presentation and Q&A analytics."""
-
 import json
 import os
-import logging
 import boto3
-from botocore.exceptions import ClientError
+from decimal import Decimal
+from datetime import datetime, timezone
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-s3_client = boto3.client('s3')
+s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
-bedrock_client = boto3.client('bedrock-runtime')
+bedrock_runtime = boto3.client('bedrock-runtime')
 
-UPLOADS_BUCKET = os.environ.get('UPLOADS_BUCKET', '')
-PERSONA_TABLE_NAME = os.environ.get('PERSONA_TABLE_NAME', '')
-ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
-MODEL_ID = os.environ.get('ANALYTICS_MODEL_ID', 'us.anthropic.claude-3-5-haiku-20241022-v1:0')
+BUCKET_NAME = os.environ.get('UPLOADS_BUCKET')
+PERSONA_TABLE_NAME = os.environ.get('PERSONA_TABLE_NAME')
+BEDROCK_MODEL_ID = 'global.anthropic.claude-haiku-4-5-20251001-v1:0'
+ALLOWED_ORIGINS: list[str] = [
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
 
-persona_table = dynamodb.Table(PERSONA_TABLE_NAME)
+FEEDBACK_FILE = 'ai_feedback.json'
+STATUS_FILE = 'ai_feedback_status.json'
+STALE_THRESHOLD_SEC = 120
+
+_current_event: dict = {}
 
 
-def get_cors_headers(event):
-    """Return CORS headers based on the request origin."""
-    origin = event.get('headers', {}).get('origin', '') or event.get('headers', {}).get('Origin', '')
-    allowed_origin = ALLOWED_ORIGINS[0]
+def _get_cors_origin() -> str:
+    """Return the request Origin if it matches ALLOWED_ORIGINS, else empty string."""
+    headers = (_current_event or {}).get("headers", {})
+    origin = headers.get("origin") or headers.get("Origin", "")
     if origin in ALLOWED_ORIGINS:
-        allowed_origin = origin
+        return origin
+    return ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else ""
+
+
+def _cors_headers() -> dict:
     return {
-        'Access-Control-Allow-Origin': allowed_origin,
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+        "Access-Control-Allow-Origin": _get_cors_origin(),
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,OPTIONS",
     }
 
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def api_response(status_code, body):
+    return {
+        "statusCode": status_code,
+        "headers": _cors_headers(),
+        "body": json.dumps(body),
+    }
+
+
+def decimal_to_float(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: decimal_to_float(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [decimal_to_float(i) for i in obj]
+    return obj
+
+
+def s3_key(user_sub, session_id, filename):
+    return f"{user_sub}/{session_id}/{filename}"
+
+
+def read_s3_text(key):
+    try:
+        return s3.get_object(Bucket=BUCKET_NAME, Key=key)['Body'].read().decode('utf-8')
+    except s3.exceptions.NoSuchKey:
+        return None
+    except Exception as e:
+        print(f"Error reading {key}: {e}")
+        return None
+
+
+def read_s3_bytes(key):
+    try:
+        return s3.get_object(Bucket=BUCKET_NAME, Key=key)['Body'].read()
+    except s3.exceptions.NoSuchKey:
+        return None
+    except Exception as e:
+        print(f"Error reading {key}: {e}")
+        return None
+
+
+def write_s3_json(key, data):
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        Body=json.dumps(data, indent=2),
+        ContentType='application/json',
+    )
+
+
+def get_persona(identifier):
+    """Look up persona by ID, falling back to scan-by-name."""
+    table = dynamodb.Table(PERSONA_TABLE_NAME)
+    try:
+        item = table.get_item(Key={'personaID': identifier}).get('Item')
+        if item:
+            return decimal_to_float(item)
+    except Exception as e:
+        print(f"Error fetching persona by ID: {e}")
+
+    try:
+        items = table.scan(
+            FilterExpression='#n = :name',
+            ExpressionAttributeNames={'#n': 'name'},
+            ExpressionAttributeValues={':name': identifier},
+        ).get('Items', [])
+        if items:
+            return decimal_to_float(items[0])
+    except Exception as e:
+        print(f"Error scanning persona by name: {e}")
+
+    return None
+
+# ─── Timestamped feedback from session analytics windows ──────────────────────
+
+# Fallback thresholds — only used when the persona has no bestPractices.
+_FALLBACK_BP = {
+    'wpm': {'min': 110, 'max': 170},
+    'eyeContact': {'min': 50},
+    'fillerWords': {'max': 5},
+    'pauses': {'min': 1},
+}
+
+def _resolve_best_practices(persona, override=None):
+    """Merge persona.bestPractices with optional per-session override.
+
+    Priority per field: override → persona → fallback default.
+    `override` is the `bestPracticesOverride` dict from the manifest
+    (may be None or partial).
+    """
+    persona_bp = persona.get('bestPractices', {}) if persona else {}
+    override = override or {}
+    resolved = {}
+    for key, default in _FALLBACK_BP.items():
+        merged = dict(default)
+        if key in persona_bp and isinstance(persona_bp[key], dict):
+            merged.update(persona_bp[key])
+        if key in override and isinstance(override[key], dict):
+            merged.update(override[key])
+        resolved[key] = merged
+    return resolved
+
+def _window_timestamp(window_number):
+    """Convert a 1-based window number to a MM:SS - MM:SS range (each window = 30s)."""
+    start_secs = (window_number - 1) * 30
+    end_secs = window_number * 30
+    start = f"{start_secs // 60:02d}:{start_secs % 60:02d}"
+    end = f"{end_secs // 60:02d}:{end_secs % 60:02d}"
+    return f"{start} - {end}"
+
+def generate_timestamped_feedback(session_analytics, persona=None, override=None):
+    """Check each 30-second window against the persona's best-practice
+    thresholds (with optional per-session override). Returns events only
+    where a metric is below standard."""
+    windows = session_analytics.get('windows', [])
+    if not windows:
+        return []
+
+    bp = _resolve_best_practices(persona, override)
+    events = []
+
+    for w in windows:
+        ts = _window_timestamp(w.get('windowNumber', 1))
+        pace = w.get('speakingPace', {}).get('average', 0)
+        eye = w.get('eyeContactScore', 100)
+        fillers = w.get('fillerWords', 0)
+        pauses = w.get('pauses', 0)
+
+        if pace > 0 and pace < bp['wpm']['min']:
+            events.append({'timestamp': ts, 'message': f'Speaking pace too slow ({pace} wpm)'})
+        elif pace > bp['wpm']['max']:
+            events.append({'timestamp': ts, 'message': f'Speaking pace too fast ({pace} wpm)'})
+
+        if eye < bp['eyeContact']['min']:
+            events.append({'timestamp': ts, 'message': f'Low eye contact ({eye}%)'})
+
+        if fillers > bp['fillerWords']['max']:
+            events.append({'timestamp': ts, 'message': f'High filler word usage ({fillers} detected)'})
+
+        if pauses < bp['pauses']['min']:
+            events.append({'timestamp': ts, 'message': f'Too few pauses ({pauses} used)'})
+
+    return events
+
+
+
+# ─── Bedrock feedback generation (prompt-based JSON, no outputConfig) ─────────
+
+def generate_feedback(persona, transcript, persona_customization=None,
+                      pdf_bytes=None, session_analytics=None,
+                      best_practices_override=None):
+    persona_name = persona.get('name', persona.get('title', 'a professional evaluator'))
+    description = persona.get('description', '')
+    communication_style = persona.get('communicationStyle', '')
+    presentation_time = persona.get('presentationTime', '')
+    expertise = persona.get('expertise', '')
+
+    key_priorities = persona.get('keyPriorities', [])
+    if isinstance(key_priorities, list):
+        if key_priorities and isinstance(key_priorities[0], dict) and 'S' in key_priorities[0]:
+            key_priorities = [item['S'] for item in key_priorities]
+        priorities_text = ', '.join(key_priorities)
+    else:
+        priorities_text = str(key_priorities)
+
+    parts = [
+        f"You are providing post-presentation feedback as a {persona_name}.",
+        "",
+        "Persona Context:",
+        f"- Role: {persona_name}",
+        f"- Description: {description}",
+        f"- Communication Style: {communication_style}",
+        f"  Presentation Time: {presentation_time}",
+        f"- Expertise: {expertise}",
+        f"- Key Priorities: {priorities_text}",
+    ]
+
+    # Surface effective thresholds (persona defaults + any per-session override)
+    # so deliveryFeedback evaluates against the same numbers the UI uses.
+    effective_bp = _resolve_best_practices(persona, best_practices_override)
+    parts.extend([
+        "",
+        "Delivery Thresholds (use these as the standard for deliveryFeedback):",
+        f"- Speaking Pace target: {effective_bp['wpm']['min']}-{effective_bp['wpm']['max']} wpm",
+        f"- Eye Contact minimum: {effective_bp['eyeContact']['min']}%",
+        f"- Filler Words: {effective_bp['fillerWords']['max']} or fewer per 30s window",
+        f"- Strategic Pauses: {effective_bp['pauses']['min']} or more per 30s window",
+    ])
+
+    if best_practices_override:
+        parts.append(
+            "Note: the listed thresholds reflect a per-session adjustment the"
+            " presenter chose for THIS session — evaluate against these, not"
+            " the persona's stored defaults."
+        )
+
+    if persona_customization:
+        parts.extend(["", "Additional Custom Instructions:", persona_customization])
+
+    parts.extend([
+        "",
+        "Presentation Transcript (with timestamps):",
+        transcript if transcript else 'No transcript available',
+    ])
+
+    if session_analytics:
+        final_avg = session_analytics.get('finalAverage', {})
+        windows = session_analytics.get('windows', [])
+        parts.extend([
+            "",
+            "Session Delivery Metrics (captured in 30-second windows):",
+            f"- Overall Speaking Pace: {final_avg.get('speakingPace', 'N/A')} words per minute",
+            f"- Overall Volume Level: {final_avg.get('volumeLevel', 'N/A')}%",
+            f"- Overall Eye Contact Score: {final_avg.get('eyeContactScore', 'N/A')}%",
+            f"- Total Filler Words: {final_avg.get('totalFillerWords', 'N/A')}",
+            f"- Total Pauses: {final_avg.get('totalPauses', 'N/A')}",
+            f"- Number of 30-second Windows: {final_avg.get('totalWindows', len(windows))}",
+        ])
+        if windows:
+            parts.append("")
+            parts.append("Per-Window Breakdown:")
+            for w in windows:
+                pace = w.get('speakingPace', {})
+                volume = w.get('volumeLevel', {})
+                parts.append(
+                    f"  Window {w.get('windowNumber', '?')} ({w.get('timestamp', '')}):"
+                    f" Pace={pace.get('average', 'N/A')}wpm"
+                    f" (SD:{pace.get('standardDeviation', 'N/A')}),"
+                    f" Volume={volume.get('average', 'N/A')}%"
+                    f" (SD:{volume.get('standardDeviation', 'N/A')}),"
+                    f" Eye Contact={w.get('eyeContactScore', 'N/A')}%,"
+                    f" Fillers={w.get('fillerWords', 0)},"
+                    f" Pauses={w.get('pauses', 0)}"
+                )
+
+    parts.extend([
+        "",
+        f"As {persona_name}, provide structured feedback on this presentation.",
+        "",
+        "CALIBRATION: Assess overall quality honestly first. Strong presentations"
+        " get refinements, not flaw lists. Weak ones get direct criticism."
+        " Match tone and severity to actual quality — don't manufacture problems.",
+        "",
+        "keyRecommendations: Return EXACTLY 5. Each needs a title (under 8 words)"
+        " and EXACTLY 3 sentences (under 60 words). Focus ONLY on content —"
+        " arguments, structure, clarity, depth. No delivery metrics here.",
+        " For strong presentations, frame as refinements, not corrections.",
+        "",
+        "performanceSummary: Overall assessment (2-3 sentences), 2-3 content"
+        " strengths (1 sentence each), and deliveryFeedback for speakingPace,"
+        " volume, eyeContact, fillerWords, pauses — each EXACTLY 2 sentences"
+        " (observation + one tip), under 30 words.",
+        "",
+    ])
+
+    if pdf_bytes:
+        parts.extend([
+            "slideFeedback: Since a presentation PDF was provided, return EXACTLY 3-5"
+            " observations about the slides. Each needs a title (under 8 words) and"
+            " description (2-3 sentences, under 60 words). Focus on visual design,"
+            " text density, layout clarity, consistency, readability, and use of"
+            " visuals/charts. Be specific — reference slide numbers or sections when possible.",
+            "",
+        ])
+
+    parts.extend([
+        f"Tone: {communication_style}. Lead with strengths. Be honest —"
+        " praise confidently when earned, critique directly when needed. Be concise.",
+    ])
+
+    tool_config = {
+        "tools": [
+            {
+                "toolSpec": {
+                    "name": "provide_feedback",
+                    "description": "Provide structured post-presentation feedback",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {
+                                "keyRecommendations": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "title": {"type": "string"},
+                                            "description": {"type": "string"}
+                                        },
+                                        "required": ["title", "description"]
+                                    }
+                                },
+                                "performanceSummary": {
+                                    "type": "object",
+                                    "properties": {
+                                        "overallAssessment": {"type": "string"},
+                                        "contentStrengths": {
+                                            "type": "array",
+                                            "items": {"type": "string"}
+                                        },
+                                        "deliveryFeedback": {
+                                            "type": "object",
+                                            "properties": {
+                                                "speakingPace": {"type": "string"},
+                                                "volume": {"type": "string"},
+                                                "eyeContact": {"type": "string"},
+                                                "fillerWords": {"type": "string"},
+                                                "pauses": {"type": "string"}
+                                            },
+                                            "required": ["speakingPace", "volume", "eyeContact", "fillerWords", "pauses"]
+                                        }
+                                    },
+                                    "required": ["overallAssessment", "contentStrengths", "deliveryFeedback"]
+                                },
+                                "slideFeedback": {
+                                    "type": "array",
+                                    "description": "Feedback on slide design and visuals. Only populate if a presentation PDF was provided.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "title": {"type": "string"},
+                                            "description": {"type": "string"}
+                                        },
+                                        "required": ["title", "description"]
+                                    }
+                                }
+                            },
+                            "required": ["keyRecommendations", "performanceSummary"]
+                        }
+                    }
+                }
+            }
+        ],
+        "toolChoice": {"tool": {"name": "provide_feedback"}}
+    }
+
+    prompt = "\n".join(parts)
+
+    message_content = [{'text': prompt}]
+    if pdf_bytes:
+        try:
+            message_content.append({
+                'document': {
+                    'format': 'pdf',
+                    'name': 'presentation',
+                    'source': {'bytes': pdf_bytes},
+                }
+            })
+            print("PDF document added to Bedrock request")
+        except Exception as e:
+            print(f"Warning: Could not add PDF: {e}")
+
+    print(f"Calling Bedrock ({BEDROCK_MODEL_ID}) with {len(message_content)} content items")
+
+    response = bedrock_runtime.converse(
+        modelId=BEDROCK_MODEL_ID,
+        messages=[{'role': 'user', 'content': message_content}],
+        toolConfig=tool_config
+    )
+
+    return response['output']['message']['content'][0]['toolUse']['input']
+
+
+# ─── Main handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    """Generate post-meeting analytics for a session."""
-    headers = get_cors_headers(event)
-
     try:
+        global _current_event
+        _current_event = event
+
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
+        user_sub = claims.get('sub')
+        if not user_sub:
+            return api_response(401, {"error": "Unauthorized"})
+
         params = event.get('queryStringParameters') or {}
-        user_id = get_user_id(event)
-        session_id = params.get('sessionId')
-        persona_id = params.get('personaId')
+        session_id = params.get('session_id')
 
-        if not session_id or not persona_id:
-            return response(400, {'error': 'Missing sessionId or personaId'}, headers)
+        if not session_id:
+            return api_response(400, {"error": "session_id is required"})
 
-        # Fetch persona details
-        persona = get_persona(persona_id)
-        if not persona:
-            return response(404, {'error': f'Persona {persona_id} not found'}, headers)
+        feedback_key = s3_key(user_sub, session_id, FEEDBACK_FILE)
+        status_key = s3_key(user_sub, session_id, STATUS_FILE)
 
-        # Fetch session data from S3
-        presentation_metrics = get_session_data(user_id, session_id, 'presentation_metrics.json')
-        qa_metrics = get_session_data(user_id, session_id, 'qa_metrics.json')
-        presentation_transcript = get_session_data(user_id, session_id, 'presentation_transcript.json')
-        qa_transcript = get_session_data(user_id, session_id, 'qa_transcript.json')
+        # ── 1. Cache hit — return immediately ────────────────────────────
+        cached = read_s3_text(feedback_key)
+        if cached:
+            print(f"Cache hit: {feedback_key}")
+            return api_response(200, json.loads(cached))
 
-        # Generate separate analytics for presentation and Q&A
-        presentation_analytics = generate_analytics(
-            persona, presentation_metrics, presentation_transcript, 'presentation'
-        )
-        qa_analytics = generate_analytics(
-            persona, qa_metrics, qa_transcript, 'qa'
-        )
+        # ── 2. Check if another invocation is already generating ─────────
+        status_str = read_s3_text(status_key)
+        if status_str:
+            status = json.loads(status_str)
 
-        result = {
-            'sessionId': session_id,
-            'personaId': persona_id,
-            'personaName': persona.get('name', ''),
-            'presentationAnalytics': presentation_analytics,
-            'qaAnalytics': qa_analytics,
-        }
+            if status.get('status') == 'failed':
+                # Clear the failed status so this invocation can retry generation
+                print(f"Previous generation failed, retrying: {status.get('error')}")
+                try:
+                    s3.delete_object(Bucket=BUCKET_NAME, Key=status_key)
+                except Exception:
+                    pass
 
-        # Save analytics to S3
-        save_analytics(user_id, session_id, result)
+            if status.get('status') == 'processing':
+                started = status.get('startedAt', '')
+                if started:
+                    elapsed = (datetime.now(timezone.utc)
+                               - datetime.fromisoformat(started)).total_seconds()
+                    if elapsed > STALE_THRESHOLD_SEC:
+                        # Clear stale processing status so next poll retries
+                        try:
+                            s3.delete_object(Bucket=BUCKET_NAME, Key=status_key)
+                        except Exception:
+                            pass
+                        return api_response(202, {"status": "processing"})
+                return api_response(202, {"status": "processing"})
 
-        return response(200, result, headers)
+        # ── 3. Nothing cached, no active job → generate synchronously ────
+        #    API Gateway may 504 after 29s, but Lambda keeps running up to
+        #    its own 120s timeout and saves the result to S3 regardless.
+        #    Next poll from the client picks up the cached result.
+        now = datetime.now(timezone.utc).isoformat()
+        write_s3_json(status_key, {'status': 'processing', 'startedAt': now})
+
+        print(f"Generating AI feedback for session {session_id}")
+
+        try:
+            prefix = s3_key(user_sub, session_id, '')
+
+            # Manifest
+            manifest_str = read_s3_text(f"{prefix}manifest.json")
+            if not manifest_str:
+                raise ValueError("Session manifest not found")
+            manifest = json.loads(manifest_str)
+            print(f"Manifest loaded: {json.dumps(manifest)}")
+
+            persona_id = manifest.get('persona')
+            if not persona_id:
+                raise ValueError("Persona not found in manifest")
+
+            # Per-session override (may be null/missing for older manifests)
+            best_practices_override = manifest.get('bestPracticesOverride') or None
+            if best_practices_override:
+                print(f"Per-session bestPractices override: {json.dumps(best_practices_override)}")
+
+            # Persona
+            persona = get_persona(persona_id)
+            if not persona:
+                raise ValueError(f"Persona {persona_id} not found in DynamoDB")
+            print(f"Persona loaded: {persona.get('name')}")
+
+            # Transcript
+            transcript_str = read_s3_text(f"{prefix}transcript.json")
+            if not transcript_str:
+                raise ValueError("Transcript not found")
+            transcript_obj = json.loads(transcript_str)
+            transcript = '\n'.join(
+                f"[{item.get('timestamp', '')}] {item.get('text', '')}"
+                for item in transcript_obj.get('transcripts', [])
+                if item.get('text')
+            )
+            print(f"Transcript: {len(transcript)} chars")
+
+            # Optional files
+            persona_customization = None
+            if manifest.get('hasPersonaCustomization'):
+                persona_customization = read_s3_text(
+                    f"{prefix}CUSTOM_PERSONA_INSTRUCTION.txt")
+
+            pdf_bytes = None
+            if manifest.get('hasPresentationPdf'):
+                pdf_bytes = read_s3_bytes(f"{prefix}presentation.pdf")
+
+            session_analytics = None
+            sa_str = read_s3_text(f"{prefix}session_analytics.json")
+            if sa_str:
+                try:
+                    session_analytics = json.loads(sa_str)
+                    print(f"Session analytics: "
+                          f"{len(session_analytics.get('windows', []))} windows")
+                except json.JSONDecodeError:
+                    print("Warning: could not parse session_analytics.json")
+
+            # Generate AI feedback
+            feedback = generate_feedback(
+                persona, transcript, persona_customization,
+                pdf_bytes, session_analytics,
+                best_practices_override=best_practices_override,
+            )
+
+            # Generate timestamped feedback from window data + (possibly overridden) thresholds
+            timestamped = []
+            if session_analytics:
+                timestamped = generate_timestamped_feedback(
+                    session_analytics, persona, override=best_practices_override,
+                )
+
+            result = {
+                'status': 'completed',
+                'sessionId': session_id,
+                'persona': {
+                    'id': persona_id,
+                    'title': persona.get('name'),
+                    'description': persona.get('description'),
+                },
+                'keyRecommendations': feedback.get('keyRecommendations', []),
+                'performanceSummary': feedback.get('performanceSummary', {}),
+                'timestampedFeedback': timestamped,
+                'generatedAt': datetime.now(timezone.utc).isoformat(),
+                'model': BEDROCK_MODEL_ID,
+                'includedFiles': {
+                    'transcript': True,
+                    'presentationPdf': pdf_bytes is not None,
+                    'personaCustomization': persona_customization is not None,
+                    'sessionAnalytics': session_analytics is not None,
+                },
+            }
+
+            write_s3_json(feedback_key, result)
+            write_s3_json(status_key, {
+                'status': 'completed',
+                'completedAt': datetime.now(timezone.utc).isoformat(),
+            })
+            print(f"AI feedback saved: {feedback_key}")
+
+            return api_response(200, result)
+
+        except Exception as e:
+            print(f"Generation failed: {e}")
+            import traceback
+            traceback.print_exc()
+            write_s3_json(status_key, {
+                'status': 'failed',
+                'error': str(e),
+                'failedAt': datetime.now(timezone.utc).isoformat(),
+            })
+            return api_response(500, {"status": "failed", "error": str(e)})
 
     except Exception as e:
-        logger.error(f'Analytics error: {e}')
-        return response(500, {'error': 'Failed to generate analytics'}, headers)
-
-
-def get_persona(persona_id):
-    """Fetch persona from DynamoDB."""
-    try:
-        result = persona_table.get_item(Key={'personaID': persona_id})
-        return result.get('Item')
-    except ClientError as e:
-        logger.error(f'DynamoDB error: {e}')
-        return None
-
-
-def get_session_data(user_id, session_id, filename):
-    """Fetch session data file from S3."""
-    key = f'{user_id}/{session_id}/{filename}'
-    try:
-        obj = s3_client.get_object(Bucket=UPLOADS_BUCKET, Key=key)
-        return json.loads(obj['Body'].read().decode('utf-8'))
-    except ClientError:
-        logger.info(f'Session data not found: {key}')
-        return None
-
-
-def generate_analytics(persona, metrics, transcript, phase):
-    """Generate AI-powered analytics for a session phase (presentation or Q&A)."""
-    if not metrics and not transcript:
-        return {
-            'overallScore': 0,
-            'metricScores': [],
-            'recommendations': [],
-            'summary': f'No {phase} data available for analysis.',
-        }
-
-    # Build prompt for Bedrock
-    persona_name = persona.get('name', 'Unknown')
-    key_priorities = persona.get('keyPriorities', [])
-    best_practices = persona.get('bestPractices', {})
-    scoring_weights = persona.get('scoringWeights', {})
-
-    prompt = f"""You are an expert presentation coach analyzing a student's {phase} performance.
-The student presented to a "{persona_name}" persona with these priorities: {json.dumps(key_priorities)}.
-
-Best practice thresholds: {json.dumps(best_practices)}
-Scoring weights: {json.dumps(scoring_weights)}
-
-Session metrics: {json.dumps(metrics) if metrics else 'No metrics captured'}
-Transcript excerpt: {json.dumps(transcript[:5000]) if transcript else 'No transcript available'}
-
-Provide analysis in this JSON format:
-{{
-  "overallScore": <0-100>,
-  "metricScores": [
-    {{"name": "<metric>", "score": <0-100>, "weight": <0-1>, "details": "<explanation>"}}
-  ],
-  "recommendations": ["<actionable recommendation 1>", "<actionable recommendation 2>", ...],
-  "summary": "<2-3 sentence summary of performance>"
-}}
-
-Focus on persona-specific feedback. For the {phase} phase, evaluate:
-{"delivery, structure, clarity, and engagement" if phase == "presentation" else "response quality, composure under pressure, relevance to questions, and confidence"}.
-"""
-
-    try:
-        bedrock_response = bedrock_client.invoke_model(
-            modelId=MODEL_ID,
-            contentType='application/json',
-            accept='application/json',
-            body=json.dumps({
-                'anthropic_version': 'bedrock-2023-05-31',
-                'max_tokens': 2000,
-                'messages': [{'role': 'user', 'content': prompt}],
-            }),
-        )
-
-        response_body = json.loads(bedrock_response['body'].read())
-        content = response_body.get('content', [{}])[0].get('text', '{}')
-
-        # Parse the JSON from the model response
-        analytics = json.loads(content)
-        return analytics
-
-    except (ClientError, json.JSONDecodeError, KeyError) as e:
-        logger.error(f'Bedrock analytics error: {e}')
-        return {
-            'overallScore': 0,
-            'metricScores': [],
-            'recommendations': ['Unable to generate AI feedback. Please try again.'],
-            'summary': f'Analytics generation failed for {phase} phase.',
-        }
-
-
-def save_analytics(user_id, session_id, analytics):
-    """Save analytics results to S3."""
-    key = f'{user_id}/{session_id}/analytics_report.json'
-    try:
-        s3_client.put_object(
-            Bucket=UPLOADS_BUCKET,
-            Key=key,
-            Body=json.dumps(analytics, default=str),
-            ContentType='application/json',
-        )
-    except ClientError as e:
-        logger.error(f'Failed to save analytics: {e}')
-
-
-def get_user_id(event):
-    """Extract user ID from Cognito authorizer claims."""
-    claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
-    return claims.get('sub', 'anonymous')
-
-
-def response(status_code, body, headers):
-    """Build API Gateway response."""
-    return {
-        'statusCode': status_code,
-        'headers': headers,
-        'body': json.dumps(body, default=str),
-    }
+        print(f"Error in lambda_handler: {e}")
+        import traceback
+        traceback.print_exc()
+        return api_response(500, {"error": f"Internal server error: {str(e)}"})

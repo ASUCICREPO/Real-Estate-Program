@@ -56,9 +56,8 @@ export default function SignUpPage({ onSwitchToLogin, onNeedConfirmation }: Sign
 
   const RequirementDot = ({ met }: { met: boolean }) => (
     <span
-      className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] transition-colors ${
-        met ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-      }`}
+      className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] transition-colors ${met ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+        }`}
     >
       {met ? <Check size={10} /> : ''}
     </span>
@@ -70,8 +69,8 @@ export default function SignUpPage({ onSwitchToLogin, onNeedConfirmation }: Sign
         {/* Logo + Header */}
         <div className="mb-8 flex flex-col items-center gap-4">
           <Image
-            src="/logo.png"
-            alt="The University of Chicago"
+            src="/ASU_WP_Carey_Horiz_RGB_MaroonGold_600ppi.png"
+            alt="W. P. Carey School of Business - Arizona State University"
             width={260}
             height={65}
             className="h-10 w-auto sm:h-12"
@@ -174,13 +173,12 @@ export default function SignUpPage({ onSwitchToLogin, onNeedConfirmation }: Sign
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter your password"
-                className={`block w-full rounded-lg border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition focus:outline-none focus:ring-2 font-sans ${
-                  confirmPassword.length > 0
+                className={`block w-full rounded-lg border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition focus:outline-none focus:ring-2 font-sans ${confirmPassword.length > 0
                     ? passwordsMatch
                       ? 'border-green-300 focus:border-green-400 focus:ring-green-100'
                       : 'border-red-300 focus:border-red-400 focus:ring-red-100'
                     : 'border-gray-300 focus:border-maroon focus:ring-maroon/20'
-                }`}
+                  }`}
               />
             </div>
 

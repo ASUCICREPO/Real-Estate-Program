@@ -48,17 +48,22 @@ export default function Header({ currentStep, onStepClick, sessionId, onTutorial
         {/* Logo Section */}
         <div className="flex shrink-0 items-center gap-3 sm:gap-4">
           <Image
-            src="/logo.png"
-            alt="The University of Chicago"
+            src="/ASU_WP_Carey_Horiz_RGB_MaroonGold_600ppi.png"
+            alt="W. P. Carey School of Business - Arizona State University"
             width={200}
             height={50}
             className="h-7 w-auto sm:h-8 lg:h-9 xl:h-10"
             priority
           />
           <div className="hidden h-6 w-px bg-gray-200 sm:block lg:h-7 xl:h-8" />
-          <span className="hidden text-sm font-semibold text-gray-800 sm:block lg:text-base xl:text-lg font-sans">
-            AI Presentation Coach
-          </span>
+          <div className="hidden sm:block">
+            <span className="text-sm font-semibold text-gray-800 lg:text-base xl:text-lg font-sans block">
+              Real Estate Presentation Coach
+            </span>
+            <span className="text-xs text-gray-500 font-sans">
+              Experiential Learning Lab
+            </span>
+          </div>
         </div>
 
         {/* Spacer pushes stepper + avatar to the right */}

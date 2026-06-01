@@ -5,8 +5,8 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Presentation Coach - University of Chicago",
-  description: "AI-powered presentation coaching and feedback system",
+  title: "Real Estate Presentation Coach - W. P. Carey School of Business",
+  description: "AI-powered presentation coaching for real estate programs at Arizona State University",
   icons: {
     icon: [
       { url: "/favicon.ico", type: "image/x-icon" },

@@ -53,8 +53,8 @@ export default function ConfirmSignUpPage({ email, onConfirmed, onBack }: Confir
         {/* Logo + Header */}
         <div className="mb-8 flex flex-col items-center gap-4">
           <Image
-            src="/logo.png"
-            alt="The University of Chicago"
+            src="/ASU_WP_Carey_Horiz_RGB_MaroonGold_600ppi.png"
+            alt="W. P. Carey School of Business - Arizona State University"
             width={260}
             height={65}
             className="h-10 w-auto sm:h-12"
