@@ -2,6 +2,8 @@
 
 An AI-powered experiential learning platform for the W. P. Carey School of Business at Arizona State University. The platform evaluates student presentations through the lens of different stakeholder personas (investors, public officials, prosecutors, negotiation counterparts) and provides actionable, role-specific feedback on presentation delivery, negotiation tactics, and strategic communication.
 
+**🌐 Live App:** [https://main.d2v1f9m26bi3az.amplifyapp.com](https://main.d2v1f9m26bi3az.amplifyapp.com)
+
 ---
 
 > **🚀 New to this template?** Start with the [GETTING_STARTED.md](./GETTING_STARTED.md) guide for setup instructions and best practices.
