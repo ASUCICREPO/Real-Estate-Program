@@ -234,6 +234,28 @@ export default function UploadContent({ personaName, sessionId, initialFileName,
         </div>
       )}
 
+      {/* Generate AI-Powered Questions */}
+      <div className="mb-8 rounded-xl border border-gray-200 bg-white p-5 2xl:p-8 2xl:mb-12">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            defaultChecked={true}
+            className="mt-0.5 h-5 w-5 rounded border-gray-300 text-maroon-600 focus:ring-maroon-500 2xl:h-6 2xl:w-6"
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm 2xl:text-base">✨</span>
+              <span className="text-sm font-semibold text-gray-900 font-sans 2xl:text-lg">
+                Generate AI-Powered Questions
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-gray-500 font-sans 2xl:text-base 2xl:leading-relaxed">
+              The AI will analyze your content and generate relevant questions that the {personaName} audience might ask at the end of your presentation. This helps you prepare for Q&A sessions.
+            </p>
+          </div>
+        </label>
+      </div>
+
       {/* Navigation Footer */}
       <div className="flex items-center justify-between border-t border-gray-100 pt-6 2xl:pt-10">
         <button

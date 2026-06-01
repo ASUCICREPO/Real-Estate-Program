@@ -291,7 +291,7 @@ export default function Home() {
   // --- Authenticated app ---
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} />
+      <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} showStepper={activeModule === 'practice-lab'} />
       <ModuleTabs activeTab={activeModule} onTabChange={setActiveModule} />
 
       {activeModule === 'practice-lab' && (

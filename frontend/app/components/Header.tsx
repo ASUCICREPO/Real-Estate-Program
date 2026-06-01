@@ -15,6 +15,7 @@ interface HeaderProps {
   onStepClick?: (step: number) => void;
   sessionId?: string;
   onTutorialOpen?: () => void;
+  showStepper?: boolean;
 }
 
 const steps: Step[] = [
@@ -25,7 +26,7 @@ const steps: Step[] = [
   { number: 5, label: 'Review Analytics' },
 ];
 
-export default function Header({ currentStep, onStepClick, sessionId, onTutorialOpen }: HeaderProps) {
+export default function Header({ currentStep, onStepClick, sessionId, onTutorialOpen, showStepper = true }: HeaderProps) {
   const { signOut, userEmail } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -69,82 +70,84 @@ export default function Header({ currentStep, onStepClick, sessionId, onTutorial
         {/* Spacer pushes stepper + avatar to the right */}
         <div className="min-w-[12px] flex-1 sm:min-w-[40px] lg:min-w-[60px]" />
 
-        {/* Stepper — scrollable on mobile */}
-        <nav className="flex items-center overflow-x-auto scrollbar-hide max-w-[55vw] sm:max-w-none sm:overflow-visible">
-          {steps.map((step, index) => {
-            const isActive = step.number === currentStep;
-            const isCompleted = step.number < currentStep;
-            const isClickable = currentStep !== 5 && (step.number < currentStep || step.number === currentStep);
+        {/* Stepper — scrollable on mobile, only shown in Practice Lab */}
+        {showStepper && (
+          <nav className="flex items-center overflow-x-auto scrollbar-hide max-w-[55vw] sm:max-w-none sm:overflow-visible">
+            {steps.map((step, index) => {
+              const isActive = step.number === currentStep;
+              const isCompleted = step.number < currentStep;
+              const isClickable = currentStep !== 5 && (step.number < currentStep || step.number === currentStep);
 
-            return (
-              <React.Fragment key={step.number}>
-                <div className="relative group">
-                  <button
-                    onClick={() => isClickable && onStepClick?.(step.number)}
-                    disabled={!isClickable}
-                    className={`
+              return (
+                <React.Fragment key={step.number}>
+                  <div className="relative group">
+                    <button
+                      onClick={() => isClickable && onStepClick?.(step.number)}
+                      disabled={!isClickable}
+                      className={`
                       flex items-center gap-1 sm:gap-1.5 lg:gap-2 transition-all duration-200
                       ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}
                     `}
-                  >
-                    {isActive ? (
-                      <div className="flex items-center gap-1 rounded-full bg-maroon px-2 py-1 sm:gap-1.5 sm:px-3 sm:py-1.5 lg:px-4 lg:py-2">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/20 text-[10px] font-medium text-white lg:h-5 lg:w-5 lg:text-xs font-sans">
-                          {step.number}
-                        </span>
-                        <span className="text-[11px] font-medium text-white sm:text-xs lg:text-sm font-sans">
-                          {step.label}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 px-1 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 lg:gap-2 lg:px-3">
-                        <span
-                          className={`
+                    >
+                      {isActive ? (
+                        <div className="flex items-center gap-1 rounded-full bg-maroon px-2 py-1 sm:gap-1.5 sm:px-3 sm:py-1.5 lg:px-4 lg:py-2">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/20 text-[10px] font-medium text-white lg:h-5 lg:w-5 lg:text-xs font-sans">
+                            {step.number}
+                          </span>
+                          <span className="text-[11px] font-medium text-white sm:text-xs lg:text-sm font-sans">
+                            {step.label}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 px-1 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 lg:gap-2 lg:px-3">
+                          <span
+                            className={`
                             flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-medium lg:h-5 lg:w-5 lg:text-xs font-sans
                             ${isCompleted ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}
                           `}
-                        >
-                          {isCompleted ? (
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                              <path
-                                d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"
-                                fill="currentColor"
-                              />
-                            </svg>
-                          ) : (
-                            step.number
-                          )}
-                        </span>
-                        <span className={`hidden text-[11px] sm:block sm:text-xs lg:text-sm font-sans ${isCompleted ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                          {step.label}
-                        </span>
+                          >
+                            {isCompleted ? (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                                <path
+                                  d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            ) : (
+                              step.number
+                            )}
+                          </span>
+                          <span className={`hidden text-[11px] sm:block sm:text-xs lg:text-sm font-sans ${isCompleted ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                            {step.label}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Tooltip */}
+                    {isClickable && !isActive && (
+                      <div className="absolute top-full left-1/2 mt-2 hidden w-max -translate-x-1/2 flex-col items-center group-hover:flex z-50">
+                        <div className="h-2 w-2 -mb-1 rotate-45 bg-gray-800" />
+                        <div className="rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg font-sans">
+                          Go back to {step.label}
+                        </div>
                       </div>
                     )}
-                  </button>
+                  </div>
 
-                  {/* Tooltip */}
-                  {isClickable && !isActive && (
-                    <div className="absolute top-full left-1/2 mt-2 hidden w-max -translate-x-1/2 flex-col items-center group-hover:flex z-50">
-                      <div className="h-2 w-2 -mb-1 rotate-45 bg-gray-800" />
-                      <div className="rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg font-sans">
-                        Go back to {step.label}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {index < steps.length - 1 && (
-                  <div
-                    className={`
+                  {index < steps.length - 1 && (
+                    <div
+                      className={`
                       mx-0.5 h-px w-4 sm:mx-1 sm:w-6 lg:mx-2 lg:w-10 xl:w-12
                       ${step.number < currentStep ? 'bg-green-600' : 'bg-gray-200'}
                     `}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </nav>
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Divider between stepper and avatar */}
         <div className="mx-2 h-6 w-px bg-gray-200 sm:mx-3" />
