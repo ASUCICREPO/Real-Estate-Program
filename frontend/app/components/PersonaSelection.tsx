@@ -233,6 +233,25 @@ export default function PersonaSelection({
         )}
       </div>
 
+      {/* Multi-Stakeholder Info */}
+      {!loading && !error && personas.length > 1 && (
+        <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50/50 p-4 2xl:p-6 2xl:mb-8">
+          <div className="flex items-start gap-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 shrink-0 mt-0.5 2xl:h-8 2xl:w-8">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-blue-600 2xl:h-5 2xl:w-5">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-blue-800 font-sans 2xl:text-base">Multi-Stakeholder Selection</h4>
+              <p className="mt-0.5 text-xs text-blue-700 font-sans leading-relaxed 2xl:text-sm">
+                You can select <strong>multiple personas</strong> to simulate presenting to a diverse stakeholder group (e.g., both Investors and Public Officials). You&apos;ll record your presentation once, then do sequential Q&A sessions with each selected persona.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Continue Button - Only visible when persona is selected */}
       <div
         className={`
