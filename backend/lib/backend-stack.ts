@@ -547,6 +547,7 @@ export class RealEstateProgramStack extends cdk.Stack {
     NagSuppressions.addResourceSuppressions(userPool, [
       { id: 'AwsSolutions-COG2', reason: 'MFA not required for student-facing tool to reduce onboarding friction.' },
       { id: 'AwsSolutions-COG3', reason: 'Threat Protection requires PLUS tier — not needed for POC.' },
+      { id: 'AwsSolutions-COG8', reason: 'Plus tier not required for POC — ESSENTIALS tier sufficient for student-facing tool.' },
     ]);
     NagSuppressions.addResourceSuppressions(api, [
       { id: 'AwsSolutions-APIG2', reason: 'Request validation handled in Lambda handlers.' },
