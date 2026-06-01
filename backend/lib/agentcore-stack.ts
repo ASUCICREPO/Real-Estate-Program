@@ -51,8 +51,9 @@ export class AgentCoreStack extends cdk.Stack {
                 'AGENT_RUNTIME_NAME': cdk.Lazy.string({
                     produce: () => agentCoreRuntime.agentRuntimeName,
                 }),
-                'BEDROCK_GUARDRAIL_ID': props.guardrailId,
-                'BEDROCK_GUARDRAIL_VERSION': props.guardrailVersion,
+                'BEDROCK_GUARDRAIL_ID': '',
+                'BEDROCK_GUARDRAIL_VERSION': '',
+                'GUARDRAIL_DISABLED': 'true',
             },
             lifecycleConfiguration: {
                 idleRuntimeSessionTimeout: cdk.Duration.minutes(10),

@@ -368,7 +368,7 @@ export class RealEstateProgramStack extends cdk.Stack {
 
     const guardrailVersion = new bedrock.CfnGuardrailVersion(this, 'ContentGuardrailVersion', {
       guardrailIdentifier: guardrail.attrGuardrailId,
-      description: 'Initial version',
+      description: 'v2: relaxed output filters for professional investor persona',
     });
 
     // Pass guardrail IDs to lambdas that call Bedrock
