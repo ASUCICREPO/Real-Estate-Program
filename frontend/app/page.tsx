@@ -13,6 +13,7 @@ import TutorialModal from './components/TutorialModal';
 import ModuleTabs, { ModuleTab } from './components/ModuleTabs';
 import NoteCardExercise from './components/NoteCardExercise';
 import ValueWebModule from './components/ValueWebModule';
+import InvestorQAPractice from './components/InvestorQAPractice';
 import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import ConfirmSignUpPage from './components/ConfirmSignUpPage';
@@ -430,14 +431,7 @@ export default function Home() {
       )}
 
       {activeModule === 'investor-qa-practice' && (
-        <div className="mx-auto w-full max-w-[800px] px-4 py-6 sm:px-6 sm:py-8 xl:max-w-[900px] 2xl:max-w-[1280px] 2xl:py-16">
-          <h1 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-4xl">
-            Investor Q&A Practice
-          </h1>
-          <p className="mt-2 text-sm text-gray-500 font-sans 2xl:text-lg">
-            Coming soon — Dedicated investor Q&A practice mode
-          </p>
-        </div>
+        <InvestorQAPractice onExit={() => setActiveModule('practice-lab')} />
       )}
 
       {/* Tutorial Modal */}
