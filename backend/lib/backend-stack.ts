@@ -27,6 +27,9 @@ export class RealEstateProgramStack extends cdk.Stack {
   public readonly authenticatedRole: iam.Role;
   public readonly personasTable: dynamodb.TableV2;
   public readonly uploadsBucket: s3.Bucket;
+  public readonly guardrailId: string;
+  public readonly guardrailVersion: string;
+  public readonly guardrailArn: string;
 
   constructor(scope: Construct, id: string, props: RealEstateProgramStackProps) {
     super(scope, id, props);
@@ -501,6 +504,9 @@ export class RealEstateProgramStack extends cdk.Stack {
     this.authenticatedRole = authenticatedRole;
     this.personasTable = personasTable;
     this.uploadsBucket = uploadsBucket;
+    this.guardrailId = guardrail.attrGuardrailId;
+    this.guardrailVersion = guardrailVersion.attrVersion;
+    this.guardrailArn = guardrail.attrGuardrailArn;
 
     // ──────────────────────────────────────────────
     // Stack Outputs
