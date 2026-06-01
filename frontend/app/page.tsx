@@ -10,6 +10,7 @@ import QASession from './components/QASession';
 import ReviewAnalytics from './components/ReviewAnalytics';
 import ConfirmationModal from './components/ConfirmationModal';
 import TutorialModal from './components/TutorialModal';
+import ModuleTabs, { ModuleTab } from './components/ModuleTabs';
 import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import ConfirmSignUpPage from './components/ConfirmSignUpPage';
@@ -34,6 +35,9 @@ export default function Home() {
   // Auth page state
   const [authView, setAuthView] = useState<AuthView>('login');
   const [confirmEmail, setConfirmEmail] = useState('');
+
+  // Module tab state
+  const [activeModule, setActiveModule] = useState<ModuleTab>('practice-lab');
 
   // App state
   const [currentStep, setCurrentStep] = useState(1);
@@ -288,129 +292,165 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} />
+      <ModuleTabs activeTab={activeModule} onTabChange={setActiveModule} />
 
-      <div key={currentStep} className="animate-step-enter">
-        {currentStep === 1 && (
-          <PersonaSelection
-            selectedPersona={selectedPersona}
-            onSelectPersona={handlePersonaSelect}
-            onPersonaNameChange={setSelectedPersonaName}
-            onTimeLimitChange={setSelectedPersonaTimeLimit}
-            onQATimeLimitChange={setSelectedPersonaQATimeLimit}
-            onPersonaDataChange={setSelectedPersonaData}
-            customNotes={customNotes}
-            onCustomNotesChange={setCustomNotes}
-            baselineOverride={baselineOverride}
-            onBaselineOverrideChange={setBaselineOverride}
-            realtimeFeedbackDefault={realtimeFeedbackDefault}
-            onRealtimeFeedbackDefaultChange={setRealtimeFeedbackDefault}
-            sessionId={sessionId}
-            onContinue={handleContinueToUpload}
-          />
-        )}
+      {activeModule === 'practice-lab' && (
+        <div key={currentStep} className="animate-step-enter">
+          {currentStep === 1 && (
+            <PersonaSelection
+              selectedPersona={selectedPersona}
+              onSelectPersona={handlePersonaSelect}
+              onPersonaNameChange={setSelectedPersonaName}
+              onTimeLimitChange={setSelectedPersonaTimeLimit}
+              onQATimeLimitChange={setSelectedPersonaQATimeLimit}
+              onPersonaDataChange={setSelectedPersonaData}
+              customNotes={customNotes}
+              onCustomNotesChange={setCustomNotes}
+              baselineOverride={baselineOverride}
+              onBaselineOverrideChange={setBaselineOverride}
+              realtimeFeedbackDefault={realtimeFeedbackDefault}
+              onRealtimeFeedbackDefaultChange={setRealtimeFeedbackDefault}
+              sessionId={sessionId}
+              onContinue={handleContinueToUpload}
+            />
+          )}
 
-        {currentStep === 2 && (
-          <UploadContent
-            personaName={selectedPersonaName}
-            sessionId={sessionId}
-            initialFileName={uploadedFileName}
-            initialUploaded={pdfUploaded}
-            onBack={handleBackToPersona}
-            onContinue={handleContinueFromUpload}
-            onPdfUploaded={(fileName) => {
-              setPdfUploaded(true);
-              setUploadedFileName(fileName);
-            }}
-          />
-        )}
+          {currentStep === 2 && (
+            <UploadContent
+              personaName={selectedPersonaName}
+              sessionId={sessionId}
+              initialFileName={uploadedFileName}
+              initialUploaded={pdfUploaded}
+              onBack={handleBackToPersona}
+              onContinue={handleContinueFromUpload}
+              onPdfUploaded={(fileName) => {
+                setPdfUploaded(true);
+                setUploadedFileName(fileName);
+              }}
+            />
+          )}
 
-        {currentStep === 3 && (
-          <PracticeSession
-            personaTitle={selectedPersonaName}
-            personaId={selectedPersona ?? ''}
-            sessionId={sessionId}
-            timeLimitSec={selectedPersonaTimeLimit}
-            hasPresentationPdf={pdfUploaded}
-            hasPersonaCustomization={customNotes.trim().length > 0}
-            bestPracticesOverride={baselineOverride}
-            effectiveBestPractices={resolveEffectiveBestPractices(selectedPersonaData, baselineOverride)}
-            realtimeFeedbackDefault={realtimeFeedbackDefault}
-            onBack={handleBackToUpload}
-            onComplete={handlePracticeComplete}
-            exitSessionRef={exitSessionRef}
-          />
-        )}
+          {currentStep === 3 && (
+            <PracticeSession
+              personaTitle={selectedPersonaName}
+              personaId={selectedPersona ?? ''}
+              sessionId={sessionId}
+              timeLimitSec={selectedPersonaTimeLimit}
+              hasPresentationPdf={pdfUploaded}
+              hasPersonaCustomization={customNotes.trim().length > 0}
+              bestPracticesOverride={baselineOverride}
+              effectiveBestPractices={resolveEffectiveBestPractices(selectedPersonaData, baselineOverride)}
+              realtimeFeedbackDefault={realtimeFeedbackDefault}
+              onBack={handleBackToUpload}
+              onComplete={handlePracticeComplete}
+              exitSessionRef={exitSessionRef}
+            />
+          )}
 
-        {currentStep === 4 && (
-          <QASession
-            personaId={selectedPersona || ''}
-            personaName={selectedPersonaName}
-            sessionId={sessionId}
-            userId={userId || ''}
-            qaTimeLimitSec={selectedPersonaQATimeLimit}
-            onBack={handleBackToPractice}
-            onComplete={handleQAComplete}
-            onSkip={handleQASkip}
-          />
-        )}
+          {currentStep === 4 && (
+            <QASession
+              personaId={selectedPersona || ''}
+              personaName={selectedPersonaName}
+              sessionId={sessionId}
+              userId={userId || ''}
+              qaTimeLimitSec={selectedPersonaQATimeLimit}
+              onBack={handleBackToPractice}
+              onComplete={handleQAComplete}
+              onSkip={handleQASkip}
+            />
+          )}
 
-        {currentStep === 5 && isWaitingForAnalytics && (
-          <div className="flex min-h-[70vh] items-center justify-center px-4">
-            <div className="mx-auto max-w-md text-center">
-              <div className="relative mx-auto mb-8 h-24 w-24">
-                <div className="absolute inset-0 animate-ping rounded-full bg-maroon-200 opacity-20" />
-                <div className="absolute inset-2 animate-pulse rounded-full bg-maroon-100 opacity-40" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <svg
-                    className="h-12 w-12 animate-spin text-maroon-600"
-                    viewBox="0 0 48 48"
-                    fill="none"
-                  >
-                    <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="80 40" opacity="0.3" />
-                    <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="30 90" />
-                  </svg>
+          {currentStep === 5 && isWaitingForAnalytics && (
+            <div className="flex min-h-[70vh] items-center justify-center px-4">
+              <div className="mx-auto max-w-md text-center">
+                <div className="relative mx-auto mb-8 h-24 w-24">
+                  <div className="absolute inset-0 animate-ping rounded-full bg-maroon-200 opacity-20" />
+                  <div className="absolute inset-2 animate-pulse rounded-full bg-maroon-100 opacity-40" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg
+                      className="h-12 w-12 animate-spin text-maroon-600"
+                      viewBox="0 0 48 48"
+                      fill="none"
+                    >
+                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="80 40" opacity="0.3" />
+                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="30 90" />
+                    </svg>
+                  </div>
                 </div>
-              </div>
 
-              <h2 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-3xl">
-                Processing Your Session
-              </h2>
-              <div className="relative mt-3 h-8 overflow-hidden">
-                <p
-                  key={processingPhase}
-                  className="animate-fade-in text-sm text-gray-500 font-sans leading-relaxed sm:text-base 2xl:text-lg"
-                >
-                  {PROCESSING_PHASES[processingPhase]}
+                <h2 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-3xl">
+                  Processing Your Session
+                </h2>
+                <div className="relative mt-3 h-8 overflow-hidden">
+                  <p
+                    key={processingPhase}
+                    className="animate-fade-in text-sm text-gray-500 font-sans leading-relaxed sm:text-base 2xl:text-lg"
+                  >
+                    {PROCESSING_PHASES[processingPhase]}
+                  </p>
+                </div>
+
+                <p className="mt-8 text-xs text-gray-400 font-sans 2xl:text-sm">
+                  Please don&apos;t close this tab while processing.
                 </p>
               </div>
-
-              <p className="mt-8 text-xs text-gray-400 font-sans 2xl:text-sm">
-                Please don&apos;t close this tab while processing.
-              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {currentStep === 5 && !isWaitingForAnalytics && sessionData && (
-          <ReviewAnalytics
-            sessionData={sessionData}
-            aiFeedback={aiFeedback}
-            qaAnalytics={qaAnalytics}
-            persona={selectedPersonaData}
-            bestPracticesOverride={baselineOverride}
-            onBackToStart={handleBackToStart}
-          />
-        )}
+          {currentStep === 5 && !isWaitingForAnalytics && sessionData && (
+            <ReviewAnalytics
+              sessionData={sessionData}
+              aiFeedback={aiFeedback}
+              qaAnalytics={qaAnalytics}
+              persona={selectedPersonaData}
+              bestPracticesOverride={baselineOverride}
+              onBackToStart={handleBackToStart}
+            />
+          )}
 
-        {currentStep === 5 && !isWaitingForAnalytics && !sessionData && (
-          <div className="flex min-h-[60vh] items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 font-serif">Review Analytics</h2>
-              <p className="mt-2 text-gray-500 font-sans">No session data available</p>
+          {currentStep === 5 && !isWaitingForAnalytics && !sessionData && (
+            <div className="flex min-h-[60vh] items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-900 font-serif">Review Analytics</h2>
+                <p className="mt-2 text-gray-500 font-sans">No session data available</p>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+
+      {activeModule === 'note-card-exercise' && (
+        <div className="mx-auto w-full max-w-[800px] px-4 py-6 sm:px-6 sm:py-8 xl:max-w-[900px] 2xl:max-w-[1280px] 2xl:py-16">
+          <h1 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-4xl">
+            Note Card Exercise
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 font-sans 2xl:text-lg">
+            Coming soon — Real Estate Development Process Game
+          </p>
+        </div>
+      )}
+
+      {activeModule === 'value-web-module' && (
+        <div className="mx-auto w-full max-w-[800px] px-4 py-6 sm:px-6 sm:py-8 xl:max-w-[900px] 2xl:max-w-[1280px] 2xl:py-16">
+          <h1 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-4xl">
+            Value Web Module
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 font-sans 2xl:text-lg">
+            Coming soon — Value web relationship mapping exercise
+          </p>
+        </div>
+      )}
+
+      {activeModule === 'investor-qa-practice' && (
+        <div className="mx-auto w-full max-w-[800px] px-4 py-6 sm:px-6 sm:py-8 xl:max-w-[900px] 2xl:max-w-[1280px] 2xl:py-16">
+          <h1 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-4xl">
+            Investor Q&A Practice
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 font-sans 2xl:text-lg">
+            Coming soon — Dedicated investor Q&A practice mode
+          </p>
+        </div>
+      )}
 
       {/* Tutorial Modal */}
       <TutorialModal
