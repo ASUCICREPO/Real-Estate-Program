@@ -11,6 +11,7 @@ import ReviewAnalytics from './components/ReviewAnalytics';
 import ConfirmationModal from './components/ConfirmationModal';
 import TutorialModal from './components/TutorialModal';
 import ModuleTabs, { ModuleTab } from './components/ModuleTabs';
+import NoteCardExercise from './components/NoteCardExercise';
 import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import ConfirmSignUpPage from './components/ConfirmSignUpPage';
@@ -420,14 +421,7 @@ export default function Home() {
       )}
 
       {activeModule === 'note-card-exercise' && (
-        <div className="mx-auto w-full max-w-[800px] px-4 py-6 sm:px-6 sm:py-8 xl:max-w-[900px] 2xl:max-w-[1280px] 2xl:py-16">
-          <h1 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-4xl">
-            Note Card Exercise
-          </h1>
-          <p className="mt-2 text-sm text-gray-500 font-sans 2xl:text-lg">
-            Coming soon — Real Estate Development Process Game
-          </p>
-        </div>
+        <NoteCardExercise onExit={() => setActiveModule('practice-lab')} />
       )}
 
       {activeModule === 'value-web-module' && (
