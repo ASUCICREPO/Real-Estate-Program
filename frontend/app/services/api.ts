@@ -516,3 +516,38 @@ export async function pollAnalytics(
   }
   throw new Error('Analytics timed out — the AI analysis is taking longer than expected');
 }
+
+// ─── Content Analysis & Question Generation ──────────────────────────
+
+export interface GeneratedQuestion {
+  questionId: string;
+  text: string;
+  category: string;
+  difficulty?: string;
+}
+
+/**
+ * Analyze uploaded content and generate persona-specific questions.
+ * POST /content
+ */
+export async function analyzeContent(
+  s3Key: string,
+  personaId: string,
+  sessionId: string,
+): Promise<GeneratedQuestion[]> {
+  const headers = {
+    ...(await authHeaders()),
+    'Content-Type': 'application/json',
+  };
+  const res = await fetch(`${API_BASE_URL}/content`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ s3Key, personaId, sessionId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to analyze content');
+  }
+  const data = await res.json();
+  return data.questions ?? [];
+}

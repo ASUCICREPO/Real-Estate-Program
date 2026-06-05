@@ -1,21 +1,25 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { getPresignedUrl, uploadFileWithPresignedUrl } from '../services/api';
+import { getPresignedUrl, uploadFileWithPresignedUrl, analyzeContent, GeneratedQuestion } from '../services/api';
 
 interface UploadContentProps {
   personaName: string;
+  personaId?: string;
   sessionId: string;
   initialFileName?: string | null;
   initialUploaded?: boolean;
   onBack: () => void;
   onContinue: () => void;
   onPdfUploaded?: (fileName: string) => void;
+  onQuestionsGenerated?: (questions: GeneratedQuestion[]) => void;
 }
 
-export default function UploadContent({ personaName, sessionId, initialFileName, initialUploaded, onBack, onContinue, onPdfUploaded }: UploadContentProps) {
+export default function UploadContent({ personaName, personaId, sessionId, initialFileName, initialUploaded, onBack, onContinue, onPdfUploaded, onQuestionsGenerated }: UploadContentProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [generateQuestions, setGenerateQuestions] = useState(true);
+  const [analyzingContent, setAnalyzingContent] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(initialUploaded ?? false);
   const [progress, setProgress] = useState(initialUploaded ? 100 : 0);
@@ -72,6 +76,20 @@ export default function UploadContent({ personaName, sessionId, initialFileName,
       setUploaded(true);
       setDisplayFileName(file.name);
       onPdfUploaded?.(file.name);
+
+      // Generate AI-powered questions if checkbox is checked
+      if (generateQuestions && personaId) {
+        setAnalyzingContent(true);
+        try {
+          const s3Key = `${sessionId}/presentation.pdf`;
+          const questions = await analyzeContent(s3Key, personaId, sessionId);
+          onQuestionsGenerated?.(questions);
+        } catch (err) {
+          console.warn('[UploadContent] Question generation failed:', err);
+        } finally {
+          setAnalyzingContent(false);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -239,7 +257,8 @@ export default function UploadContent({ personaName, sessionId, initialFileName,
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
-            defaultChecked={true}
+            checked={generateQuestions}
+            onChange={(e) => setGenerateQuestions(e.target.checked)}
             className="mt-0.5 h-5 w-5 rounded border-gray-300 text-maroon-600 focus:ring-maroon-500 2xl:h-6 2xl:w-6"
           />
           <div>
@@ -248,6 +267,9 @@ export default function UploadContent({ personaName, sessionId, initialFileName,
               <span className="text-sm font-semibold text-gray-900 font-sans 2xl:text-lg">
                 Generate AI-Powered Questions
               </span>
+              {analyzingContent && (
+                <span className="text-xs text-maroon-600 animate-pulse font-sans">Analyzing...</span>
+              )}
             </div>
             <p className="mt-1 text-sm text-gray-500 font-sans 2xl:text-base 2xl:leading-relaxed">
               The AI will analyze your content and generate relevant questions that the {personaName} audience might ask at the end of your presentation. This helps you prepare for Q&A sessions.

@@ -321,6 +321,7 @@ export default function Home() {
           {currentStep === 2 && (
             <UploadContent
               personaName={selectedPersonaName}
+              personaId={selectedPersona || undefined}
               sessionId={sessionId}
               initialFileName={uploadedFileName}
               initialUploaded={pdfUploaded}
