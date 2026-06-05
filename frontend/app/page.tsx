@@ -49,6 +49,8 @@ export default function Home() {
   const [selectedPersonaTimeLimit, setSelectedPersonaTimeLimit] = useState<number | undefined>(undefined);
   const [selectedPersonaQATimeLimit, setSelectedPersonaQATimeLimit] = useState<number | undefined>(undefined);
   const [selectedPersonaData, setSelectedPersonaData] = useState<Persona | null>(null);
+  // Multi-persona support: additional personas for panel Q&A
+  const [additionalPersonas, setAdditionalPersonas] = useState<Persona[]>([]);
   const [customNotes, setCustomNotes] = useState('');
   // Per-session overrides chosen on the persona step. Reset on persona change & restart.
   const [baselineOverride, setBaselineOverride] = useState<Partial<PersonaBestPractices> | null>(null);
@@ -225,6 +227,16 @@ export default function Home() {
     setCustomNotes('');
     setBaselineOverride(null);
     setRealtimeFeedbackDefault(ANALYSIS_CONFIG.SHOW_REALTIME_FEEDBACK);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Multi-persona: go back to Q&A step with a different persona (reuse same session)
+  const handleTryAnotherPersona = () => {
+    setCurrentStep(4);
+    setQaAnalytics(null);
+    qaAnalyticsPromiseRef.current = null;
+    didQASessionRef.current = false;
+    setIsWaitingForAnalytics(false);
     window.scrollTo({ top: 0 });
   };
 

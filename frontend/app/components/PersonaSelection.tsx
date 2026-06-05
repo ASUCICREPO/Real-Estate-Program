@@ -251,8 +251,6 @@ export default function PersonaSelection({
           </div>
         </div>
       )}
-
-      {/* Continue Button - Only visible when persona is selected */}
       <div
         className={`
           flex flex-col items-end gap-2 transition-all duration-[400ms] ease-out

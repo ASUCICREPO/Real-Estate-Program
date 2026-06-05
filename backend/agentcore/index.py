@@ -104,6 +104,58 @@ def build_qa_system_prompt(persona_name, persona_prompt, custom_instructions, tr
     return prompt
 
 
+def build_panel_system_prompt(personas: list, transcript_text: str, session_duration: int) -> str:
+    """Build a combined panel system prompt for multi-persona Q&A."""
+    qa_duration = session_duration // 60
+    if qa_duration <= 0:
+        qa_duration = 1
+
+    persona_descriptions = []
+    for p in personas:
+        persona_descriptions.append(
+            f"- **{p.get('name', 'Stakeholder')}**: {p.get('personaPrompt', p.get('description', ''))}"
+        )
+
+    personas_text = "\n".join(persona_descriptions)
+    persona_names = ", ".join(p.get('name', 'Stakeholder') for p in personas)
+
+    prompt = f"""You are facilitating a panel Q&A session with multiple stakeholders evaluating a real estate development presentation. You represent ALL of the following perspectives and should alternate between them:
+
+PANEL MEMBERS:
+{personas_text}
+
+YOUR BEHAVIOR:
+1. Alternate between personas throughout the session — don't stay in one perspective too long
+2. When asking a question, briefly identify which stakeholder perspective you're representing (e.g., "As your investor, I need to understand..." or "From a public policy standpoint...")
+3. Ask ONE question at a time from ONE persona's perspective
+4. Each persona should get roughly equal airtime
+5. Keep the session to approximately {qa_duration} minutes
+6. End the conversation gracefully when time is up using stop_conversation
+
+QUESTION PRIORITIES BY PERSONA:
+"""
+
+    for p in personas:
+        priorities = p.get('keyPriorities', [])
+        if priorities:
+            prompt += f"\n{p.get('name', 'Stakeholder')}:\n"
+            for priority in priorities[:4]:
+                prompt += f"  - {priority}\n"
+
+    prompt += f"""
+GUIDELINES:
+- Be direct, professional, and skeptical where appropriate
+- Reference specific parts of the presentation when possible
+- If the presenter gives a vague answer, push for specifics from that persona's perspective
+- Maintain each persona's communication style when speaking as them
+- You will receive TIME CHECK messages — wrap up gracefully when time is running out
+
+PRESENTATION TRANSCRIPT:
+{transcript_text}
+"""
+    return prompt
+
+
 # ── Nova Sonic model factory ─────────────────────────────────────────
 
 def create_nova_sonic_model(voice_id=None):
@@ -539,17 +591,24 @@ async def websocket_handler(websocket, context: RequestContext):
         return
 
     persona_id = raw.get("personaId", "")
+    persona_ids = raw.get("personaIds", [])  # Multi-persona support
     user_id = raw.get("userId", "")
     voice_id = raw.get("voiceId", DEFAULT_VOICE_ID)
     session_id = raw.get("sessionId", "") or (context.session_id or "")
 
-    print(f"[WebSocket] Setup: user={user_id} persona={persona_id} session={session_id}", flush=True)
+    # Support both single persona and multi-persona
+    if not persona_ids and persona_id:
+        persona_ids = [persona_id]
+    elif isinstance(persona_ids, str):
+        persona_ids = [p.strip() for p in persona_ids.split(",") if p.strip()]
+
+    print(f"[WebSocket] Setup: user={user_id} personas={persona_ids} session={session_id}", flush=True)
 
     _otel_ctx = baggage.set_baggage("session.id", session_id)
     _otel_token = otel_context.attach(_otel_ctx)
 
-    if not persona_id or not user_id or not session_id:
-        await websocket.send_json({"type": "error", "message": "Missing personaId, userId, or sessionId"})
+    if not persona_ids or not user_id or not session_id:
+        await websocket.send_json({"type": "error", "message": "Missing personaId(s), userId, or sessionId"})
         await websocket.close()
         return
 
@@ -559,25 +618,38 @@ async def websocket_handler(websocket, context: RequestContext):
     client_disconnected = False
 
     try:
-        persona_data = await load_persona(persona_id)
-        if not persona_data:
-            await websocket.send_json({"type": "error", "message": f"Persona {persona_id} not found"})
+        # Load all selected personas
+        all_personas = []
+        for pid in persona_ids:
+            p = await load_persona(pid)
+            if p:
+                all_personas.append(p)
+
+        if not all_personas:
+            await websocket.send_json({"type": "error", "message": "No valid personas found"})
             await websocket.close()
             return
+
+        persona_data = all_personas[0]  # Primary persona for analytics
 
         transcript_text = await load_transcript(user_id, session_id)
         if not transcript_text:
             transcript_text = "No presentation transcript available."
 
-        session_duration = int(persona_data.get('qaTimeLimitSec', 300))
+        # Average QA time limits across personas
+        session_duration = int(sum(int(p.get('qaTimeLimitSec', 300)) for p in all_personas) / len(all_personas))
 
-        system_prompt = build_qa_system_prompt(
-            persona_name=persona_data.get('name', 'Stakeholder'),
-            persona_prompt=persona_data.get('personaPrompt', ''),
-            custom_instructions=persona_data.get('description', ''),
-            transcript_text=transcript_text,
-            session_duration=session_duration,
-        )
+        # Build combined panel prompt if multiple personas
+        if len(all_personas) == 1:
+            system_prompt = build_qa_system_prompt(
+                persona_name=persona_data.get('name', 'Stakeholder'),
+                persona_prompt=persona_data.get('personaPrompt', ''),
+                custom_instructions=persona_data.get('description', ''),
+                transcript_text=transcript_text,
+                session_duration=session_duration,
+            )
+        else:
+            system_prompt = build_panel_system_prompt(all_personas, transcript_text, session_duration)
 
         model = create_nova_sonic_model(voice_id)
         time_guard = SessionTimeGuard(session_duration)
