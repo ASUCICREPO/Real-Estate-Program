@@ -19,6 +19,8 @@ interface PersonaSelectionProps {
   onTimeLimitChange: (sec: number | undefined) => void;
   onQATimeLimitChange: (sec: number | undefined) => void;
   onPersonaDataChange: (persona: Persona | null) => void;
+  additionalPersonas?: Persona[];
+  onAdditionalPersonasChange?: (personas: Persona[]) => void;
   customNotes: string;
   onCustomNotesChange: (notes: string) => void;
   baselineOverride: Partial<PersonaBestPractices> | null;
@@ -112,6 +114,8 @@ export default function PersonaSelection({
   onTimeLimitChange,
   onQATimeLimitChange,
   onPersonaDataChange,
+  additionalPersonas = [],
+  onAdditionalPersonasChange,
   customNotes,
   onCustomNotesChange,
   baselineOverride,
@@ -234,7 +238,7 @@ export default function PersonaSelection({
       </div>
 
       {/* Multi-Stakeholder Info */}
-      {!loading && !error && personas.length > 1 && (
+      {!loading && !error && personas.length > 1 && selectedPersona && (
         <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50/50 p-4 2xl:p-6 2xl:mb-8">
           <div className="flex items-start gap-3">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 shrink-0 mt-0.5 2xl:h-8 2xl:w-8">
@@ -242,11 +246,37 @@ export default function PersonaSelection({
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" />
               </svg>
             </div>
-            <div>
+            <div className="flex-1">
               <h4 className="text-sm font-bold text-blue-800 font-sans 2xl:text-base">Multi-Stakeholder Selection</h4>
               <p className="mt-0.5 text-xs text-blue-700 font-sans leading-relaxed 2xl:text-sm">
-                You can select <strong>multiple personas</strong> to simulate presenting to a diverse stakeholder group (e.g., both Investors and Public Officials). You&apos;ll record your presentation once, then do sequential Q&A sessions with each selected persona.
+                Select additional personas for a <strong>panel-style Q&A</strong>. The AI will alternate between stakeholder perspectives during one session.
               </p>
+              {/* Checkboxes for other personas */}
+              <div className="mt-3 space-y-2">
+                {personas
+                  .filter(p => p.personaID !== selectedPersona)
+                  .map(p => {
+                    const isChecked = additionalPersonas.some(ap => ap.personaID === p.personaID);
+                    return (
+                      <label key={p.personaID} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              onAdditionalPersonasChange?.(additionalPersonas.filter(ap => ap.personaID !== p.personaID));
+                            } else {
+                              onAdditionalPersonasChange?.([...additionalPersonas, p]);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 font-sans">{p.name}</span>
+                        <span className="text-xs text-gray-400 font-sans">({p.expertise})</span>
+                      </label>
+                    );
+                  })}
+              </div>
             </div>
           </div>
         </div>

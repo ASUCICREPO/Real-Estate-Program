@@ -319,6 +319,8 @@ export default function Home() {
               onTimeLimitChange={setSelectedPersonaTimeLimit}
               onQATimeLimitChange={setSelectedPersonaQATimeLimit}
               onPersonaDataChange={setSelectedPersonaData}
+              additionalPersonas={additionalPersonas}
+              onAdditionalPersonasChange={setAdditionalPersonas}
               customNotes={customNotes}
               onCustomNotesChange={setCustomNotes}
               baselineOverride={baselineOverride}
@@ -366,6 +368,7 @@ export default function Home() {
           {currentStep === 4 && (
             <QASession
               personaId={selectedPersona || ''}
+              personaIds={additionalPersonas.length > 0 ? [selectedPersona || '', ...additionalPersonas.map(p => p.personaID)] : undefined}
               personaName={selectedPersonaName}
               sessionId={sessionId}
               userId={userId || ''}

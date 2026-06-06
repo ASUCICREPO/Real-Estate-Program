@@ -12,6 +12,7 @@ import QAOrbPanel from './qa/QAOrbPanel';
 
 interface QASessionProps {
   personaId: string;
+  personaIds?: string[];  // Multi-persona panel support
   personaName: string;
   sessionId: string;
   userId: string;
@@ -30,6 +31,7 @@ function formatTime(seconds: number): string {
 
 export default function QASession({
   personaId,
+  personaIds,
   personaName: initialPersonaName,
   sessionId,
   userId,
@@ -52,13 +54,14 @@ export default function QASession({
   const wsConfig = useMemo<QAWebSocketConfig>(
     () => ({
       personaId,
+      personaIds: personaIds && personaIds.length > 0 ? personaIds : undefined,
       sessionId,
       userId,
       dateStr,
       voiceId,
       getIdToken,
     }),
-    [personaId, sessionId, userId, dateStr, voiceId, getIdToken],
+    [personaId, personaIds, sessionId, userId, dateStr, voiceId, getIdToken],
   );
 
   const durationSec = qaTimeLimitSec ?? DEFAULT_QA_TIME_LIMIT_SEC;

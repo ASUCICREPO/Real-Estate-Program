@@ -4,6 +4,7 @@ import { getAwsCredentials } from './awsCredentials';
 
 export interface QAWebSocketConfig {
   personaId: string;
+  personaIds?: string[];  // Multi-persona panel support
   sessionId: string;
   userId: string;
   dateStr: string;
@@ -55,7 +56,7 @@ export class QAWebSocketClient {
   async connect(): Promise<void> {
     try {
       const credentials = await getAwsCredentials(this.config.getIdToken);
-      
+
       // Sign only the bare WS URL — AgentCore strips custom query params before
       // they reach the container. We deliver them via a setup message instead.
       const signedUrl = await signWebSocketUrl(
@@ -63,50 +64,51 @@ export class QAWebSocketClient {
         credentials,
         cognitoConfig.region
       );
-      
+
       console.log('[QA WebSocket] Connecting with SigV4 authentication...');
-      
+
       return new Promise((resolve, reject) => {
         this.ws = new WebSocket(signedUrl);
 
-      this.ws.onopen = () => {
-        console.log('[QA WebSocket] Connected — sending setup');
-        this._isConnected = true;
-        this.reconnectAttempts = 0;
-        // Send session parameters as first message
-        this.send({
-          action: 'setup',
-          personaId: this.config.personaId,
-          userId: this.config.userId,
-          sessionId: this.config.sessionId,
-          dateStr: this.config.dateStr,
-          voiceId: this.config.voiceId ?? 'matthew',
-        });
-        resolve();
-      };
+        this.ws.onopen = () => {
+          console.log('[QA WebSocket] Connected — sending setup');
+          this._isConnected = true;
+          this.reconnectAttempts = 0;
+          // Send session parameters as first message
+          this.send({
+            action: 'setup',
+            personaId: this.config.personaId,
+            personaIds: this.config.personaIds || [this.config.personaId],
+            userId: this.config.userId,
+            sessionId: this.config.sessionId,
+            dateStr: this.config.dateStr,
+            voiceId: this.config.voiceId ?? 'matthew',
+          });
+          resolve();
+        };
 
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as QAWebSocketEvent;
-          this.eventHandler(data);
-        } catch (e) {
-          console.error('[QA WebSocket] Failed to parse message:', e);
-        }
-      };
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data) as QAWebSocketEvent;
+            this.eventHandler(data);
+          } catch (e) {
+            console.error('[QA WebSocket] Failed to parse message:', e);
+          }
+        };
 
-      this.ws.onclose = (event) => {
-        console.log(`[QA WebSocket] Closed: code=${event.code}, reason=${event.reason}`);
-        this._isConnected = false;
-        if (!this._closing) {
-          this.eventHandler({ type: 'session_ended', reason: 'connection_closed' });
-        }
-      };
+        this.ws.onclose = (event) => {
+          console.log(`[QA WebSocket] Closed: code=${event.code}, reason=${event.reason}`);
+          this._isConnected = false;
+          if (!this._closing) {
+            this.eventHandler({ type: 'session_ended', reason: 'connection_closed' });
+          }
+        };
 
-      this.ws.onerror = (error) => {
-        console.error('[QA WebSocket] Error:', error);
-        this._isConnected = false;
-        reject(error);
-      };
+        this.ws.onerror = (error) => {
+          console.error('[QA WebSocket] Error:', error);
+          this._isConnected = false;
+          reject(error);
+        };
       });
     } catch (error) {
       console.error('[QA WebSocket] Failed to establish connection:', error);
