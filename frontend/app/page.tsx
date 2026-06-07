@@ -231,15 +231,6 @@ export default function Home() {
   };
 
   // Multi-persona: go back to Q&A step with a different persona (reuse same session)
-  const handleTryAnotherPersona = () => {
-    setCurrentStep(4);
-    setQaAnalytics(null);
-    qaAnalyticsPromiseRef.current = null;
-    didQASessionRef.current = false;
-    setIsWaitingForAnalytics(false);
-    window.scrollTo({ top: 0 });
-  };
-
   const handleStepClick = (step: number) => {
     if (step > currentStep) {
       if (step === 2 && !selectedPersona) return;

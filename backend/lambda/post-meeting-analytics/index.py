@@ -486,11 +486,29 @@ def lambda_handler(event, context):
             if best_practices_override:
                 print(f"Per-session bestPractices override: {json.dumps(best_practices_override)}")
 
-            # Persona
+            # Persona (primary)
             persona = get_persona(persona_id)
             if not persona:
                 raise ValueError(f"Persona {persona_id} not found in DynamoDB")
             print(f"Persona loaded: {persona.get('name')}")
+
+            # Multi-persona: load additional personas and merge their priorities into the primary
+            additional_persona_ids = manifest.get('additionalPersonaIds', [])
+            if additional_persona_ids:
+                for ap_id in additional_persona_ids:
+                    ap = get_persona(ap_id)
+                    if ap:
+                        print(f"Additional persona loaded: {ap.get('name')}")
+                        # Merge key priorities
+                        existing_priorities = persona.get('keyPriorities', [])
+                        additional_priorities = ap.get('keyPriorities', [])
+                        persona['keyPriorities'] = existing_priorities + additional_priorities
+                        # Append name for combined title
+                        persona['name'] = persona.get('name', '') + ' & ' + ap.get('name', '')
+                        # Merge communication style
+                        persona['communicationStyle'] = (
+                            persona.get('communicationStyle', '') + '; ' + ap.get('communicationStyle', '')
+                        )
 
             # Transcript
             transcript_str = read_s3_text(f"{prefix}transcript.json")
