@@ -175,68 +175,6 @@ export default function PersonaSelection({
         </p>
       </div>
 
-      {/* Multi-Stakeholder Selection — above persona cards */}
-      {!loading && !error && personas.length > 1 && (
-        <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50/50 p-4 2xl:p-6 2xl:mb-8">
-          <div className="flex items-start gap-3">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 shrink-0 mt-0.5 2xl:h-8 2xl:w-8">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-blue-600 2xl:h-5 2xl:w-5">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-bold text-blue-800 font-sans 2xl:text-base">Multi-Stakeholder Selection</h4>
-              <p className="mt-0.5 text-xs text-blue-700 font-sans leading-relaxed 2xl:text-sm">
-                Select <strong>multiple personas</strong> for a panel-style Q&A. The AI will alternate between stakeholder perspectives during one session.
-              </p>
-              <div className="mt-3 space-y-2">
-                {personas.map(p => {
-                  const isPrimary = selectedPersona === p.personaID;
-                  const isAdditional = additionalPersonas.some(ap => ap.personaID === p.personaID);
-                  const isChecked = isPrimary || isAdditional;
-                  return (
-                    <label key={p.personaID} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          if (isPrimary) {
-                            // Deselect primary — clear everything
-                            onSelectPersona(null);
-                            onPersonaNameChange('');
-                            onTimeLimitChange(undefined);
-                            onQATimeLimitChange(undefined);
-                            onPersonaDataChange(null);
-                            onAdditionalPersonasChange?.([]);
-                          } else if (isAdditional) {
-                            // Remove from additional
-                            onAdditionalPersonasChange?.(additionalPersonas.filter(ap => ap.personaID !== p.personaID));
-                          } else if (!selectedPersona) {
-                            // No primary yet — make this the primary
-                            onSelectPersona(p.personaID);
-                            onPersonaNameChange(p.name);
-                            onTimeLimitChange(p.timeLimitSec);
-                            onQATimeLimitChange(p.qaTimeLimitSec);
-                            onPersonaDataChange(p);
-                          } else {
-                            // Add as additional
-                            onAdditionalPersonasChange?.([...additionalPersonas, p]);
-                          }
-                        }}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className={`text-sm font-sans ${isPrimary ? 'font-semibold text-maroon-700' : 'text-gray-700'}`}>{p.name}</span>
-                      <span className="text-xs text-gray-400 font-sans">({p.expertise})</span>
-                      {isPrimary && <span className="text-xs bg-maroon-100 text-maroon-700 px-1.5 py-0.5 rounded font-sans">Primary</span>}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Persona Cards */}
       <div className="mb-6 2xl:mb-8 space-y-3 2xl:space-y-4">
         {loading ? (
@@ -251,7 +189,9 @@ export default function PersonaSelection({
           </div>
         ) : (
           personas.map((persona) => {
-            const isThisSelected = selectedPersona === persona.personaID;
+            const isPrimary = selectedPersona === persona.personaID;
+            const isAdditional = additionalPersonas.some(ap => ap.personaID === persona.personaID);
+            const isThisSelected = isPrimary || isAdditional;
             const defaults = resolveDefaults(persona);
             return (
               <PersonaCard
@@ -265,15 +205,31 @@ export default function PersonaSelection({
                 communicationStyle={persona.communicationStyle}
                 isSelected={isThisSelected}
                 onSelect={() => {
-                  const isDeselecting = isThisSelected;
-                  onSelectPersona(isDeselecting ? null : persona.personaID);
-                  onPersonaNameChange(isDeselecting ? '' : persona.name);
-                  onTimeLimitChange(isDeselecting ? undefined : persona.timeLimitSec);
-                  onQATimeLimitChange(isDeselecting ? undefined : persona.qaTimeLimitSec);
-                  onPersonaDataChange(isDeselecting ? null : persona);
+                  if (isPrimary) {
+                    // Deselect primary
+                    onSelectPersona(null);
+                    onPersonaNameChange('');
+                    onTimeLimitChange(undefined);
+                    onQATimeLimitChange(undefined);
+                    onPersonaDataChange(null);
+                    onAdditionalPersonasChange?.([]);
+                  } else if (isAdditional) {
+                    // Remove from additional
+                    onAdditionalPersonasChange?.(additionalPersonas.filter(ap => ap.personaID !== persona.personaID));
+                  } else if (!selectedPersona) {
+                    // No primary — make this primary
+                    onSelectPersona(persona.personaID);
+                    onPersonaNameChange(persona.name);
+                    onTimeLimitChange(persona.timeLimitSec);
+                    onQATimeLimitChange(persona.qaTimeLimitSec);
+                    onPersonaDataChange(persona);
+                  } else {
+                    // Already have a primary — add as additional
+                    onAdditionalPersonasChange?.([...additionalPersonas, persona]);
+                  }
                 }}
                 expandedExtra={
-                  isThisSelected ? (
+                  isPrimary ? (
                     <>
                       <CustomizePersona
                         value={customNotes}
