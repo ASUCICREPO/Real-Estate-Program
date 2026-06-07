@@ -45,7 +45,7 @@ export default function Header({ currentStep, onStepClick, sessionId, onTutorial
 
   return (
     <header className="w-full border-b border-gray-100 bg-white">
-      <div className="mx-auto flex w-full items-center px-4 py-3 sm:px-6 lg:px-8 xl:px-12">
+      <div className="mx-auto flex w-full items-center px-3 py-3 sm:px-4 lg:px-6 xl:px-8">
         {/* Logo Section */}
         <div className="flex shrink-0 items-center gap-3 sm:gap-4">
           <Image
@@ -58,17 +58,17 @@ export default function Header({ currentStep, onStepClick, sessionId, onTutorial
           />
           <div className="hidden h-6 w-px bg-gray-200 sm:block lg:h-7 xl:h-8" />
           <div className="hidden sm:block">
-            <span className="text-sm font-semibold text-gray-800 lg:text-base xl:text-lg font-sans block">
+            <span className="text-xs font-semibold text-gray-800 lg:text-sm font-sans block">
               Real Estate Presentation Coach
             </span>
-            <span className="text-xs text-gray-500 font-sans">
+            <span className="text-[10px] text-gray-500 font-sans lg:text-xs">
               Experiential Learning Lab
             </span>
           </div>
         </div>
 
         {/* Spacer pushes stepper + avatar to the right */}
-        <div className="min-w-[12px] flex-1 sm:min-w-[40px] lg:min-w-[60px]" />
+        <div className="min-w-[8px] flex-1 sm:min-w-[16px] lg:min-w-[24px]" />
 
         {/* Stepper — scrollable on mobile, only shown in Practice Lab */}
         {showStepper && (
