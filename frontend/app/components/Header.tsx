@@ -16,6 +16,7 @@ interface HeaderProps {
   sessionId?: string;
   onTutorialOpen?: () => void;
   showStepper?: boolean;
+  onSessionHistoryOpen?: () => void;
 }
 
 const steps: Step[] = [
@@ -26,7 +27,7 @@ const steps: Step[] = [
   { number: 5, label: 'Review Analytics' },
 ];
 
-export default function Header({ currentStep, onStepClick, sessionId, onTutorialOpen, showStepper = true }: HeaderProps) {
+export default function Header({ currentStep, onStepClick, sessionId, onTutorialOpen, showStepper = true, onSessionHistoryOpen }: HeaderProps) {
   const { signOut, userEmail } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -198,6 +199,16 @@ export default function Header({ currentStep, onStepClick, sessionId, onTutorial
                 </div>
               )}
               <div className="py-1">
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    onSessionHistoryOpen?.();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50 hover:text-maroon font-sans"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-current"><path d="M13 3a9 9 0 11-9 9h2a7 7 0 107-7V8l-4-4 4-4v3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" fill="currentColor" /></svg>
+                  Session History
+                </button>
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);

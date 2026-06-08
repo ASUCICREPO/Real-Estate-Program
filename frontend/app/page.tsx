@@ -14,6 +14,7 @@ import ModuleTabs, { ModuleTab } from './components/ModuleTabs';
 import NoteCardExercise from './components/NoteCardExercise';
 import ValueWebModule from './components/ValueWebModule';
 import InvestorQAPractice from './components/InvestorQAPractice';
+import SessionHistory from './components/SessionHistory';
 import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import ConfirmSignUpPage from './components/ConfirmSignUpPage';
@@ -75,6 +76,7 @@ export default function Home() {
 
   // Tutorial State
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isSessionHistoryOpen, setIsSessionHistoryOpen] = useState(false);
 
   // Ref for PracticeSession exit cleanup
   const exitSessionRef = useRef<(() => void) | null>(null);
@@ -297,7 +299,7 @@ export default function Home() {
   // --- Authenticated app ---
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} showStepper={activeModule === 'practice-lab'} />
+      <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} showStepper={activeModule === 'practice-lab'} onSessionHistoryOpen={() => setIsSessionHistoryOpen(true)} />
       <ModuleTabs activeTab={activeModule} onTabChange={setActiveModule} />
 
       {activeModule === 'practice-lab' && (
@@ -440,6 +442,12 @@ export default function Home() {
       {activeModule === 'investor-qa-practice' && (
         <InvestorQAPractice onExit={() => setActiveModule('practice-lab')} />
       )}
+
+      {/* Session History Modal */}
+      <SessionHistory
+        isOpen={isSessionHistoryOpen}
+        onClose={() => setIsSessionHistoryOpen(false)}
+      />
 
       {/* Tutorial Modal */}
       <TutorialModal

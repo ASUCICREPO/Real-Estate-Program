@@ -306,6 +306,46 @@ def abort_multipart(user_id: str, session_id: str, upload_id: str) -> bool:
         return False
 
 
+# ─── List sessions for a user ─────────────────────────────────────────
+
+def _list_sessions(user_id: str) -> dict:
+    """List all sessions for a user by finding manifest.json files in S3."""
+    prefix = f"{user_id}/"
+    sessions = []
+
+    try:
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=UPLOADS_BUCKET, Prefix=prefix, Delimiter='/'):
+            for common_prefix in page.get('CommonPrefixes', []):
+                session_prefix = common_prefix['Prefix']
+                session_id = session_prefix.rstrip('/').split('/')[-1]
+
+                # Try to read manifest for this session
+                manifest_key = f"{session_prefix}manifest.json"
+                try:
+                    obj = s3_client.get_object(Bucket=UPLOADS_BUCKET, Key=manifest_key)
+                    manifest = json.loads(obj['Body'].read().decode('utf-8'))
+                    sessions.append({
+                        'sessionId': session_id,
+                        'persona': manifest.get('persona', ''),
+                        'startTime': manifest.get('startTime', ''),
+                        'endTime': manifest.get('endTime', ''),
+                        'status': manifest.get('status', 'unknown'),
+                        'durationSec': manifest.get('durationSec', 0),
+                    })
+                except (s3_client.exceptions.NoSuchKey, ClientError):
+                    # No manifest — skip this session
+                    pass
+
+        # Sort by start time descending (newest first)
+        sessions.sort(key=lambda s: s.get('startTime', ''), reverse=True)
+        return _response(200, {'sessions': sessions})
+
+    except ClientError as e:
+        print(f"[ERROR] Failed to list sessions: {e}")
+        return _response(500, {'message': 'Failed to list sessions'})
+
+
 # ─── Lambda handler ───────────────────────────────────────────────────
 def lambda_handler(event, context):
     """AWS Lambda handler for S3 upload operations.
@@ -347,12 +387,18 @@ def lambda_handler(event, context):
         authorizer = event.get('requestContext', {}).get('authorizer', {})
         user_id = authorizer.get('claims', {}).get('sub')
         qs = event.get('queryStringParameters') or {}
-        session_id = qs.get('session_id')
 
-        if not session_id:
-            return _response(400, {'message': "Missing 'session_id' query parameter."})
         if not user_id:
             return _response(400, {'message': "User ID not found in request context."})
+
+        # list_sessions doesn't need session_id
+        action = qs.get('action')
+        if method == 'GET' and action == 'list_sessions':
+            return _list_sessions(user_id)
+
+        session_id = qs.get('session_id')
+        if not session_id:
+            return _response(400, {'message': "Missing 'session_id' query parameter."})
     except (KeyError, AttributeError) as e:
         print(f"[ERROR] Missing required information: {e}")
         return _response(400, {'message': "Missing session_id or user authentication information."})

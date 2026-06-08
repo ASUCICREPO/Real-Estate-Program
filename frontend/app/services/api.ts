@@ -551,3 +551,26 @@ export async function analyzeContent(
   const data = await res.json();
   return data.questions ?? [];
 }
+
+// ─── Session History ─────────────────────────────────────────────────
+
+export interface SessionHistoryEntry {
+  sessionId: string;
+  persona: string;
+  startTime: string;
+  endTime?: string;
+  status: string;
+  durationSec: number;
+}
+
+export async function listSessions(): Promise<SessionHistoryEntry[]> {
+  const headers = await authHeaders();
+  try {
+    const res = await fetch(`${API_BASE_URL}/s3_urls?action=list_sessions`, { headers });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.sessions ?? [];
+  } catch {
+    return [];
+  }
+}
