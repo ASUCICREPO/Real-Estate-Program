@@ -557,6 +557,7 @@ export async function analyzeContent(
 export interface SessionHistoryEntry {
   sessionId: string;
   persona: string;
+  personaName?: string;
   startTime: string;
   endTime?: string;
   status: string;

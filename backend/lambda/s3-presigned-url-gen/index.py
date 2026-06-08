@@ -313,6 +313,16 @@ def _list_sessions(user_id: str) -> dict:
     prefix = f"{user_id}/"
     sessions = []
 
+    # Load persona names for display
+    persona_names = {}
+    try:
+        table = dynamodb.Table(PERSONA_TABLE_NAME)
+        scan_result = table.scan(ProjectionExpression='personaID, #n', ExpressionAttributeNames={'#n': 'name'})
+        for item in scan_result.get('Items', []):
+            persona_names[item['personaID']] = item.get('name', item['personaID'])
+    except Exception as e:
+        print(f"[WARN] Failed to load persona names: {e}")
+
     try:
         paginator = s3_client.get_paginator('list_objects_v2')
         for page in paginator.paginate(Bucket=UPLOADS_BUCKET, Prefix=prefix, Delimiter='/'):
@@ -325,19 +335,19 @@ def _list_sessions(user_id: str) -> dict:
                 try:
                     obj = s3_client.get_object(Bucket=UPLOADS_BUCKET, Key=manifest_key)
                     manifest = json.loads(obj['Body'].read().decode('utf-8'))
+                    persona_id = manifest.get('persona', '')
                     sessions.append({
                         'sessionId': session_id,
-                        'persona': manifest.get('persona', ''),
+                        'persona': persona_id,
+                        'personaName': persona_names.get(persona_id, persona_id),
                         'startTime': manifest.get('startTime', ''),
                         'endTime': manifest.get('endTime', ''),
                         'status': manifest.get('status', 'unknown'),
                         'durationSec': manifest.get('durationSec', 0),
                     })
                 except (s3_client.exceptions.NoSuchKey, ClientError):
-                    # No manifest — skip this session
                     pass
 
-        # Sort by start time descending (newest first)
         sessions.sort(key=lambda s: s.get('startTime', ''), reverse=True)
         return _response(200, {'sessions': sessions})
 
