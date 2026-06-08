@@ -69,8 +69,8 @@ export class RealEstateProgramStack extends cdk.Stack {
           abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
         },
         {
-          id: 'ExpireSessionFilesAfter30Days',
-          expiration: cdk.Duration.days(30),
+          id: 'ExpireSessionFilesAfter14Days',
+          expiration: cdk.Duration.days(14),
         },
       ],
     });
