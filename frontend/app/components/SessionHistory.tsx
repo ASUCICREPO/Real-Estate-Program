@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { listSessions, SessionHistoryEntry } from '../services/api';
-import { Clock, FileText, X } from 'lucide-react';
+import { listSessions, getVideoPlaybackUrl, SessionHistoryEntry } from '../services/api';
+import { Clock, FileText, X, ExternalLink } from 'lucide-react';
 
 interface SessionHistoryProps {
     isOpen: boolean;
@@ -69,7 +69,7 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-gray-900 font-sans">
-                                                {session.persona || 'Unknown Persona'}
+                                                {session.personaName || session.persona || 'Unknown Persona'}
                                             </p>
                                             <p className="text-xs text-gray-500 font-sans mt-0.5">
                                                 {formatDate(session.startTime)}
@@ -81,13 +81,28 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
                                                 <span>{formatDuration(session.durationSec)}</span>
                                             </div>
                                             <span className={`text-xs px-2 py-0.5 rounded-full font-sans ${session.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                    session.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
-                                                        'bg-gray-100 text-gray-500'
+                                                session.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-gray-100 text-gray-500'
                                                 }`}>
                                                 {session.status}
                                             </span>
                                         </div>
                                     </div>
+                                    {session.status === 'completed' && (
+                                        <div className="mt-3 flex gap-2">
+                                            <button
+                                                onClick={async () => {
+                                                    const url = await getVideoPlaybackUrl(session.sessionId);
+                                                    if (url) window.open(url, '_blank');
+                                                    else alert('Recording not available');
+                                                }}
+                                                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition font-sans"
+                                            >
+                                                <ExternalLink size={12} />
+                                                View Recording
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
