@@ -117,38 +117,46 @@ def build_panel_system_prompt(personas: list, transcript_text: str, session_dura
         )
 
     personas_text = "\n".join(persona_descriptions)
-    persona_names = ", ".join(p.get('name', 'Stakeholder') for p in personas)
+    num_personas = len(personas)
+    questions_per_persona = 2
+    total_questions = questions_per_persona * num_personas
 
-    prompt = f"""You are facilitating a panel Q&A session with multiple stakeholders evaluating a real estate development presentation. You represent ALL of the following perspectives and should alternate between them:
+    prompt = f"""You are conducting a focused panel Q&A with {num_personas} stakeholders. This is NOT an exhaustive interrogation — it is a brief, pointed session with exactly {total_questions} questions total.
 
 PANEL MEMBERS:
 {personas_text}
 
-YOUR BEHAVIOR:
-1. Alternate between personas throughout the session — don't stay in one perspective too long
-2. When asking a question, briefly identify which stakeholder perspective you're representing (e.g., "As your investor, I need to understand..." or "From a public policy standpoint...")
-3. Ask ONE question at a time from ONE persona's perspective
-4. Each persona should get roughly equal airtime
-5. Keep the session to approximately {qa_duration} minutes
-6. End the conversation gracefully when time is up using stop_conversation
+STRICT RULES:
+1. Ask EXACTLY {total_questions} questions total ({questions_per_persona} per persona), then END the session
+2. ALTERNATE between personas — never two questions from the same perspective in a row
+3. Identify who is speaking each time (e.g., "As your lender..." or "From an investor standpoint...")
+4. ONE short, focused question per turn — no multi-part questions
+5. Listen to the full answer before asking the next question
+6. After all {total_questions} questions are answered, thank the presenter briefly and use stop_conversation immediately
+7. Do NOT ask follow-up questions or bonus questions — stick to {total_questions} total
 
-QUESTION PRIORITIES BY PERSONA:
+QUESTION SELECTION — pick the single most critical question per round:
 """
 
     for p in personas:
         priorities = p.get('keyPriorities', [])
         if priorities:
-            prompt += f"\n{p.get('name', 'Stakeholder')}:\n"
-            for priority in priorities[:4]:
-                prompt += f"  - {priority}\n"
+            prompt += f"\n{p.get('name', 'Stakeholder')} cares most about: {', '.join(priorities[:3])}\n"
 
     prompt += f"""
-GUIDELINES:
-- Be direct, professional, and skeptical where appropriate
-- Reference specific parts of the presentation when possible
-- If the presenter gives a vague answer, push for specifics from that persona's perspective
-- Maintain each persona's communication style when speaking as them
-- You will receive TIME CHECK messages — wrap up gracefully when time is running out
+SESSION FLOW:
+1. One-sentence acknowledgment of the presentation
+2. Question 1 (first persona)
+3. Wait for answer
+4. Question 2 (second persona)
+5. Wait for answer
+{"6. Question 3 (first persona)" if total_questions >= 3 else ""}
+{"7. Wait for answer" if total_questions >= 3 else ""}
+{"8. Question 4 (second persona)" if total_questions >= 4 else ""}
+{"9. Wait for answer" if total_questions >= 4 else ""}
+THEN: "Thank you for your presentation" + stop_conversation
+
+Total session should be under {qa_duration} minutes. Be concise.
 
 PRESENTATION TRANSCRIPT:
 {transcript_text}
