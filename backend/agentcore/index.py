@@ -659,7 +659,10 @@ async def websocket_handler(websocket, context: RequestContext):
         else:
             system_prompt = build_panel_system_prompt(all_personas, transcript_text, session_duration)
 
-        model = create_nova_sonic_model(voice_id)
+        # Use persona-specific voice if available, otherwise client-provided or default
+        persona_voice = persona_data.get('voiceId', None)
+        effective_voice = persona_voice or voice_id
+        model = create_nova_sonic_model(effective_voice)
         time_guard = SessionTimeGuard(session_duration)
         agent = BidiAgent(
             model=model,
