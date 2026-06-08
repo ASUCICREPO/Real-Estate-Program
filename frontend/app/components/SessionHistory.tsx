@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { listSessions, getVideoPlaybackUrl, fetchAnalytics, SessionHistoryEntry } from '../services/api';
-import { Clock, FileText, X, ExternalLink } from 'lucide-react';
+import { Clock, FileText, X, ExternalLink, Download, Loader2 } from 'lucide-react';
 
 interface SessionHistoryProps {
     isOpen: boolean;
@@ -12,6 +12,7 @@ interface SessionHistoryProps {
 export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps) {
     const [sessions, setSessions] = useState<SessionHistoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -22,41 +23,65 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
     if (!isOpen) return null;
 
     function formatDate(iso: string) {
-        if (!iso) return '—';
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        if (!iso) return '\u2014';
+        return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
     function formatDuration(sec: number) {
-        if (!sec) return '—';
-        const m = Math.floor(sec / 60);
-        const s = sec % 60;
-        return `${m}m ${s}s`;
+        if (!sec) return '\u2014';
+        return `${Math.floor(sec / 60)}m ${sec % 60}s`;
     }
 
-    async function handleDownloadReport(session: SessionHistoryEntry) {
+    async function handleDownloadPdf(session: SessionHistoryEntry) {
+        if (downloadingId) return;
+        setDownloadingId(session.sessionId);
         try {
-            const data = await fetchAnalytics(session.sessionId);
-            const report = [
-                `SESSION REPORT - ${session.personaName || session.persona}`,
-                `Date: ${formatDate(session.startTime)}`,
-                `Duration: ${formatDuration(session.durationSec)}`,
-                '',
-                '--- KEY RECOMMENDATIONS ---',
-                ...(data.keyRecommendations || []).map((r: any, i: number) => `${i + 1}. ${r.title}: ${r.description}`),
-                '',
-                '--- PERFORMANCE SUMMARY ---',
-                `Overall: ${data.performanceSummary?.overallAssessment || 'N/A'}`,
-            ].join('\n');
-            const blob = new Blob([report], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `session-report-${session.sessionId.slice(-8)}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
+            const aiFeedback = await fetchAnalytics(session.sessionId);
+            const { jsPDF } = await import('jspdf');
+            const doc = new jsPDF();
+            const margin = 20;
+            let y = margin;
+
+            doc.setFontSize(18);
+            doc.setTextColor(140, 29, 64);
+            doc.text('Session Report', margin, y); y += 10;
+
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Persona: ${session.personaName || session.persona}`, margin, y); y += 5;
+            doc.text(`Date: ${formatDate(session.startTime)}`, margin, y); y += 5;
+            doc.text(`Duration: ${formatDuration(session.durationSec)}`, margin, y); y += 12;
+
+            if (aiFeedback.performanceSummary?.overallAssessment) {
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0);
+                doc.text('Overall Assessment', margin, y); y += 7;
+                doc.setFontSize(10);
+                doc.setTextColor(60, 60, 60);
+                const lines = doc.splitTextToSize(aiFeedback.performanceSummary.overallAssessment, 170);
+                doc.text(lines, margin, y); y += lines.length * 5 + 8;
+            }
+
+            if (aiFeedback.keyRecommendations?.length) {
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0);
+                doc.text('Key Recommendations', margin, y); y += 7;
+                for (const rec of aiFeedback.keyRecommendations) {
+                    if (y > 270) { doc.addPage(); y = margin; }
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(`• ${rec.title}`, margin, y); y += 5;
+                    doc.setTextColor(80, 80, 80);
+                    const desc = doc.splitTextToSize(rec.description, 165);
+                    doc.text(desc, margin + 5, y); y += desc.length * 5 + 4;
+                }
+            }
+
+            doc.save(`session-report-${session.sessionId.slice(-8)}.pdf`);
         } catch {
-            alert('Report not available yet');
+            alert('PDF report not available for this session yet.');
+        } finally {
+            setDownloadingId(null);
         }
     }
 
@@ -66,16 +91,11 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
             <div className="relative w-full max-w-lg max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-xl flex flex-col">
                 <div className="flex items-center justify-between border-b px-6 py-4">
                     <h2 className="text-lg font-bold text-gray-900 font-serif italic">Session History</h2>
-                    <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
-                        <X size={20} />
-                    </button>
+                    <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"><X size={20} /></button>
                 </div>
-
                 <div className="flex-1 overflow-y-auto px-6 py-4">
                     {loading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-maroon" />
-                        </div>
+                        <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-maroon" /></div>
                     ) : sessions.length === 0 ? (
                         <div className="text-center py-12">
                             <FileText size={32} className="mx-auto text-gray-300 mb-3" />
@@ -91,12 +111,8 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
                                             <p className="text-xs text-gray-500 font-sans mt-0.5">{formatDate(session.startTime)}</p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-1 text-xs text-gray-400">
-                                                <Clock size={12} />
-                                                <span>{formatDuration(session.durationSec)}</span>
-                                            </div>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-sans ${session.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                                                }`}>{session.status}</span>
+                                            <div className="flex items-center gap-1 text-xs text-gray-400"><Clock size={12} /><span>{formatDuration(session.durationSec)}</span></div>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-sans ${session.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{session.status}</span>
                                         </div>
                                     </div>
                                     {session.status === 'completed' && (
@@ -105,9 +121,10 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
                                                 className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition font-sans">
                                                 <ExternalLink size={12} /> View Recording
                                             </button>
-                                            <button onClick={() => handleDownloadReport(session)}
-                                                className="flex items-center gap-1.5 rounded-lg border border-maroon-200 bg-maroon-50 px-3 py-1.5 text-xs font-medium text-maroon-700 hover:bg-maroon-100 transition font-sans">
-                                                <FileText size={12} /> Download Report
+                                            <button onClick={() => handleDownloadPdf(session)} disabled={downloadingId === session.sessionId}
+                                                className="flex items-center gap-1.5 rounded-lg border border-maroon-200 bg-maroon-50 px-3 py-1.5 text-xs font-medium text-maroon-700 hover:bg-maroon-100 transition font-sans disabled:opacity-50">
+                                                {downloadingId === session.sessionId ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                                                {downloadingId === session.sessionId ? 'Generating...' : 'Download PDF Report'}
                                             </button>
                                         </div>
                                     )}
@@ -116,10 +133,7 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
                         </div>
                     )}
                 </div>
-
-                <div className="border-t px-6 py-3">
-                    <p className="text-xs text-gray-400 font-sans text-center">Sessions are retained for 14 days</p>
-                </div>
+                <div className="border-t px-6 py-3"><p className="text-xs text-gray-400 font-sans text-center">Sessions are retained for 14 days</p></div>
             </div>
         </div>
     );
