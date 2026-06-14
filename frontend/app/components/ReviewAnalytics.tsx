@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SessionAnalytics } from '../hooks/useSessionAnalytics';
-import { AIFeedbackResponse, QAAnalyticsResponse, getVideoPlaybackUrl, getPresentationPdfUrl, fetchTranscript } from '../services/api';
+import { AIFeedbackResponse, QAAnalyticsResponse, getVideoPlaybackUrl, getPresentationPdfUrl, fetchTranscript, uploadReportPdf } from '../services/api';
 import {
   Download,
   TrendingUp,
@@ -151,6 +151,33 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
     getVideoPlaybackUrl(sessionData.sessionId).then(setVideoUrl);
     getPresentationPdfUrl(sessionData.sessionId).then(setSlidesUrl);
   }, [sessionData.sessionId]);
+
+  // Auto-save PDF report to S3 for session history access
+  const pdfSavedRef = useRef(false);
+  useEffect(() => {
+    if (pdfSavedRef.current || !aiFeedback) return;
+    pdfSavedRef.current = true;
+    (async () => {
+      try {
+        const blob = await pdf(
+          <ReportDocument
+            sessionData={sessionData}
+            aiFeedback={aiFeedback}
+            qaAnalytics={qaAnalytics}
+            stats={stats}
+            overallScore={overallScore}
+            feedbackPersonaLabel={aiFeedback?.persona?.title || "Persona"}
+            bp={bp}
+            BEST_PRACTICES={BEST_PRACTICES}
+          />
+        ).toBlob();
+        await uploadReportPdf(sessionData.sessionId, blob);
+        console.log('[ReviewAnalytics] Report PDF auto-saved to S3');
+      } catch (err) {
+        console.warn('[ReviewAnalytics] Failed to auto-save PDF:', err);
+      }
+    })();
+  }, [aiFeedback, sessionData, qaAnalytics]);
 
   const bp = resolveBestPractices(persona, bestPracticesOverride);
   const weights = resolveScoringWeights(persona);

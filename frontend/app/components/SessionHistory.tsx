@@ -1,21 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { listSessions, getVideoPlaybackUrl, fetchAnalytics, getManifestData, fetchQAAnalytics, SessionHistoryEntry } from '../services/api';
+import { listSessions, getVideoPlaybackUrl, getReportPdfUrl, SessionHistoryEntry } from '../services/api';
 import { Clock, FileText, X, ExternalLink, Download, Loader2 } from 'lucide-react';
-import { pdf } from '@react-pdf/renderer';
-import { ReportDocument } from './ReportPDF';
-import { Persona, PersonaBestPractices, DEFAULT_BEST_PRACTICES } from '../config/config';
-import { fetchPersonas } from '../services/api';
-
-function buildBestPracticeChecks(bp: PersonaBestPractices) {
-    return {
-        wpm: { label: bp.wpm.label ?? 'Speaking Pace', range: `${bp.wpm.min}-${bp.wpm.max} wpm`, check: (v: number) => v >= bp.wpm.min && v <= bp.wpm.max },
-        eyeContact: { label: bp.eyeContact.label ?? 'Eye Contact', range: `\u2265${bp.eyeContact.min}%`, check: (v: number) => v >= bp.eyeContact.min },
-        fillers: { label: bp.fillerWords.label ?? 'Filler Words', range: `\u2264${bp.fillerWords.max}/window`, check: (v: number) => v <= bp.fillerWords.max },
-        pauses: { label: bp.pauses.label ?? 'Pauses', range: `\u2265${bp.pauses.min}/window`, check: (v: number) => v >= bp.pauses.min },
-    };
-}
 
 interface SessionHistoryProps {
     isOpen: boolean;
@@ -26,14 +13,11 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
     const [sessions, setSessions] = useState<SessionHistoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
-    const [personas, setPersonas] = useState<Persona[]>([]);
 
     useEffect(() => {
         if (!isOpen) return;
         setLoading(true);
-        Promise.all([listSessions(), fetchPersonas()])
-            .then(([s, p]) => { setSessions(s); setPersonas(p); })
-            .finally(() => setLoading(false));
+        listSessions().then(setSessions).finally(() => setLoading(false));
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -52,62 +36,14 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
         if (downloadingId) return;
         setDownloadingId(session.sessionId);
         try {
-            const [aiFeedback, manifest, qaAnalytics] = await Promise.all([
-                fetchAnalytics(session.sessionId),
-                getManifestData(session.sessionId),
-                fetchQAAnalytics(session.sessionId),
-            ]);
-
-            // Find the persona for best practices
-            const persona = personas.find(p => p.personaID === session.persona) || null;
-            const bp: PersonaBestPractices = persona?.bestPractices
-                ? { ...DEFAULT_BEST_PRACTICES, ...persona.bestPractices }
-                : DEFAULT_BEST_PRACTICES;
-            const BEST_PRACTICES = buildBestPracticeChecks(bp);
-
-            // Build sessionData from manifest (may not have windows for past sessions)
-            const sessionData = {
-                sessionId: session.sessionId,
-                windows: (manifest as any)?.windows || [],
-                durationSec: session.durationSec || 0,
-            };
-
-            // Compute stats from windows (if available)
-            const windows = sessionData.windows;
-            const stats = windows.length > 0 ? {
-                avgWpm: Math.round(windows.reduce((s: number, w: any) => s + (w.speakingPace?.average || 0), 0) / windows.length),
-                avgVolume: Math.round(windows.reduce((s: number, w: any) => s + (w.volumeLevel?.average || 0), 0) / windows.length),
-                avgEyeContact: Math.round(windows.reduce((s: number, w: any) => s + (w.eyeContactScore || 0), 0) / windows.length),
-                totalFillers: windows.reduce((s: number, w: any) => s + (w.fillerWords || 0), 0),
-                totalPauses: windows.reduce((s: number, w: any) => s + (w.pauses || 0), 0),
-            } : null;
-
-            const overallScore = aiFeedback?.performanceSummary ? 75 : 0; // Approximate if no windows
-
-            const blob = await pdf(
-                <ReportDocument
-                    sessionData={sessionData as any}
-                    aiFeedback={aiFeedback}
-                    qaAnalytics={qaAnalytics}
-                    stats={stats}
-                    overallScore={overallScore}
-                    feedbackPersonaLabel={session.personaName || session.persona || 'Persona'}
-                    bp={bp}
-                    BEST_PRACTICES={BEST_PRACTICES}
-                />
-            ).toBlob();
-
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `presentation_report_${session.sessionId.slice(-8)}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('PDF generation failed:', err);
-            alert('PDF report not available for this session yet.');
+            const url = await getReportPdfUrl(session.sessionId);
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert('PDF report not available for this session. Complete a session to generate a report.');
+            }
+        } catch {
+            alert('Failed to fetch report PDF.');
         } finally {
             setDownloadingId(null);
         }
@@ -152,7 +88,7 @@ export default function SessionHistory({ isOpen, onClose }: SessionHistoryProps)
                                             <button onClick={() => handleDownloadPdf(session)} disabled={downloadingId === session.sessionId}
                                                 className="flex items-center gap-1.5 rounded-lg border border-maroon-200 bg-maroon-50 px-3 py-1.5 text-xs font-medium text-maroon-700 hover:bg-maroon-100 transition font-sans disabled:opacity-50">
                                                 {downloadingId === session.sessionId ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                                                {downloadingId === session.sessionId ? 'Generating...' : 'Download PDF Report'}
+                                                {downloadingId === session.sessionId ? 'Loading...' : 'View PDF Report'}
                                             </button>
                                         </div>
                                     )}

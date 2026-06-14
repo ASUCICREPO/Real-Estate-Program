@@ -19,7 +19,7 @@ ALLOWED_ORIGINS: list[str] = [
 # ─── Constants — fixed S3 filenames (overwrite on re-upload) ──────────
 AUTHORIZED_REQUEST_TYPES = [
     'ppt', 'session', 'metric_chunk',
-    'transcript', 'session_analytics', 'detailed_metrics', 'manifest',
+    'transcript', 'session_analytics', 'detailed_metrics', 'manifest', 'report_pdf',
 ]
 
 S3_FILENAMES = {
@@ -31,6 +31,7 @@ S3_FILENAMES = {
     'session_analytics': 'session_analytics.json',
     'detailed_metrics': 'detailed_metrics.json',
     'manifest': 'manifest.json',
+    'report_pdf': 'report.pdf',
 }
 
 if not UPLOADS_BUCKET:
@@ -146,6 +147,14 @@ def get_upload_url(request_type: str, user_id: str, session_id: str) -> Optional
                 Bucket=UPLOADS_BUCKET, Key=key,
                 Fields={"Content-Type": "application/json"},
                 Conditions=[{"Content-Type": "application/json"}],
+                ExpiresIn=JSON_UPLOAD_TIMEOUT,
+            )
+        elif request_type == 'report_pdf':
+            print(f"[INFO] Presigned URL for PDF report -> {key}")
+            response = s3_client.generate_presigned_post(
+                Bucket=UPLOADS_BUCKET, Key=key,
+                Fields={"Content-Type": "application/pdf"},
+                Conditions=[{"Content-Type": "application/pdf"}],
                 ExpiresIn=JSON_UPLOAD_TIMEOUT,
             )
         else:
@@ -552,6 +561,19 @@ def lambda_handler(event, context):
                 return _response(200, data)
             except s3_client.exceptions.NoSuchKey:
                 return _response(404, {'message': 'Transcript not found'})
+
+        # Route: presigned GET URL for the saved PDF report
+        if action == 'get_report_pdf':
+            key = f"{user_id}/{session_id}/report.pdf"
+            try:
+                url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': UPLOADS_BUCKET, 'Key': key},
+                    ExpiresIn=PRESENTATION_TIMEOUT,
+                )
+                return _response(200, {'url': url})
+            except ClientError:
+                return _response(404, {'message': 'Report PDF not found'})
             except ClientError as e:
                 print(f"[ERROR] Failed to fetch transcript: {e}")
                 return _response(500, {'message': 'Failed to fetch transcript'})

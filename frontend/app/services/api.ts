@@ -575,3 +575,24 @@ export async function listSessions(): Promise<SessionHistoryEntry[]> {
     return [];
   }
 }
+
+// ─── Report PDF ──────────────────────────────────────────────────────
+
+export async function uploadReportPdf(sessionId: string, blob: Blob): Promise<void> {
+  const presigned = await getPresignedUrl('report_pdf' as S3RequestType, sessionId);
+  const formData = new FormData();
+  Object.entries(presigned.fields).forEach(([key, value]) => formData.append(key, value));
+  formData.append('file', blob, 'report.pdf');
+  const res = await fetch(presigned.presigned_url, { method: 'POST', body: formData });
+  if (!res.ok && res.status >= 300) throw new Error('Failed to upload report PDF');
+}
+
+export async function getReportPdfUrl(sessionId: string): Promise<string | null> {
+  const headers = await authHeaders();
+  try {
+    const res = await fetch(`${API_BASE_URL}/s3_urls?action=get_report_pdf&session_id=${sessionId}`, { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url || null;
+  } catch { return null; }
+}
