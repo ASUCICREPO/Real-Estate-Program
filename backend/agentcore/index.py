@@ -118,7 +118,7 @@ def build_panel_system_prompt(personas: list, transcript_text: str, session_dura
 
     personas_text = "\n".join(persona_descriptions)
     num_personas = len(personas)
-    questions_per_persona = 2
+    questions_per_persona = 4
     total_questions = questions_per_persona * num_personas
 
     prompt = f"""You are conducting a focused panel Q&A with {num_personas} stakeholders. This is NOT an exhaustive interrogation — it is a brief, pointed session with exactly {total_questions} questions total.

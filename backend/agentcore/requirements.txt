@@ -4,3 +4,4 @@ boto3>=1.40.0
 aioboto3>=12.0.0
 pyaudio>=0.2.14
 jinja2>=3.1.6
+# Force rebuild Sun Jun 14 14:29:30 MST 2026
