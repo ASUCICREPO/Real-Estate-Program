@@ -10,6 +10,7 @@ PDF_UPLOAD_TIMEOUT: int = int(os.environ.get("PDF_UPLOAD_TIMEOUT", 120))
 JSON_UPLOAD_TIMEOUT: int = int(os.environ.get("JSON_UPLOAD_TIMEOUT", 60))
 MULTIPART_PART_URL_TIMEOUT: int = int(os.environ.get("MULTIPART_PART_URL_TIMEOUT", 300))
 UPLOADS_BUCKET: str = os.environ.get("UPLOADS_BUCKET")
+PERSONA_TABLE_NAME: str = os.environ.get("PERSONA_TABLE_NAME", "")
 PERSONA_GUARDRAIL_ID: str = os.environ.get("PERSONA_GUARDRAIL_ID", "")
 PERSONA_GUARDRAIL_VERSION: str = os.environ.get("PERSONA_GUARDRAIL_VERSION", "")
 ALLOWED_ORIGINS: list[str] = [
@@ -39,6 +40,7 @@ if not UPLOADS_BUCKET:
     raise ValueError("UPLOADS_BUCKET environment variable is not set")
 
 s3_client = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
 bedrock_runtime = boto3.client('bedrock-runtime')
 
 

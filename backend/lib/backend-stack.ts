@@ -204,6 +204,7 @@ export class RealEstateProgramStack extends cdk.Stack {
       }),
       environment: {
         'UPLOADS_BUCKET': uploadsBucket.bucketName,
+        'PERSONA_TABLE_NAME': personasTable.tableName,
         'PDF_UPLOAD_TIMEOUT': '120',
         'PRESENTATION_TIMEOUT': '1200',
         'JSON_UPLOAD_TIMEOUT': '60',
@@ -213,6 +214,7 @@ export class RealEstateProgramStack extends cdk.Stack {
     });
 
     uploadsBucket.grantReadWrite(s3UrlLambda);
+    personasTable.grantReadData(s3UrlLambda);
 
     // ──────────────────────────────────────────────
     // Lambda: Persona CRUD
