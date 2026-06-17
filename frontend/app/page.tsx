@@ -10,10 +10,6 @@ import QASession from './components/QASession';
 import ReviewAnalytics from './components/ReviewAnalytics';
 import ConfirmationModal from './components/ConfirmationModal';
 import TutorialModal from './components/TutorialModal';
-import ModuleTabs, { ModuleTab } from './components/ModuleTabs';
-import NoteCardExercise from './components/NoteCardExercise';
-import ValueWebModule from './components/ValueWebModule';
-import InvestorQAPractice from './components/InvestorQAPractice';
 import SessionHistory from './components/SessionHistory';
 import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
@@ -40,8 +36,7 @@ export default function Home() {
   const [authView, setAuthView] = useState<AuthView>('login');
   const [confirmEmail, setConfirmEmail] = useState('');
 
-  // Module tab state
-  const [activeModule, setActiveModule] = useState<ModuleTab>('practice-lab');
+  // Module tab state (removed - modules moved to separate project)
 
   // App state
   const [currentStep, setCurrentStep] = useState(1);
@@ -299,10 +294,8 @@ export default function Home() {
   // --- Authenticated app ---
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} showStepper={activeModule === 'practice-lab'} onSessionHistoryOpen={() => setIsSessionHistoryOpen(true)} />
-      <ModuleTabs activeTab={activeModule} onTabChange={setActiveModule} />
+      <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} showStepper={true} onSessionHistoryOpen={() => setIsSessionHistoryOpen(true)} />
 
-      {activeModule === 'practice-lab' && (
         <div key={currentStep} className="animate-step-enter">
           {currentStep === 1 && (
             <PersonaSelection
@@ -429,19 +422,9 @@ export default function Home() {
             </div>
           )}
         </div>
-      )}
 
-      {activeModule === 'note-card-exercise' && (
-        <NoteCardExercise onExit={() => setActiveModule('practice-lab')} />
-      )}
 
-      {activeModule === 'value-web-module' && (
-        <ValueWebModule onExit={() => setActiveModule('practice-lab')} />
-      )}
 
-      {activeModule === 'investor-qa-practice' && (
-        <InvestorQAPractice onExit={() => setActiveModule('practice-lab')} />
-      )}
 
       {/* Session History Modal */}
       <SessionHistory
