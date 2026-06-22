@@ -222,11 +222,12 @@ class SessionTimeGuard:
 class WebSocketBidiInput(BidiInput):
     """Bridge browser WebSocket audio into BidiAgent input events."""
 
-    def __init__(self, websocket: WebSocket, time_guard: SessionTimeGuard | None = None):
+    def __init__(self, websocket: WebSocket, time_guard: SessionTimeGuard | None = None, ignore_end: bool = False):
         self._ws = websocket
         self._stopped = False
         self._analytics_requested = asyncio.Event()
         self._time_guard = time_guard
+        self._ignore_end = ignore_end
 
     async def start(self, agent: BidiAgent) -> None:
         self._stopped = False
@@ -268,6 +269,10 @@ class WebSocketBidiInput(BidiInput):
             elif action == "get_analytics":
                 self._analytics_requested.set()
             elif action == "end":
+                if self._ignore_end:
+                    # In multi-persona mode, ignore end signals from client mid-session
+                    print("[WebSocketBidiInput] Ignoring 'end' action (multi-persona mode)", flush=True)
+                    continue
                 self._stopped = True
                 raise asyncio.CancelledError("client ended session")
         raise asyncio.CancelledError("input stopped")
@@ -572,6 +577,9 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
     Each persona gets a strict question limit and its own time allocation.
     After the limit is hit or time expires, we cleanly stop the agent and
     move to the next persona.
+    
+    IMPORTANT: Analytics are only sent AFTER all personas complete, to prevent
+    the frontend from sending 'end' and killing subsequent persona sessions.
     """
     all_transcript_entries = []
     client_disconnected = False
@@ -592,12 +600,11 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
                 f"{'Q' if e['role'] == 'assistant' else 'A'}: {e['text']}" for e in all_transcript_entries[-10:]
             )
 
-        # Inject strict question limit into custom instructions
+        # Inject question limit into custom instructions
         question_limit_instruction = (
-            f"\n\nSTRICT QUESTION LIMIT: You MUST ask EXACTLY {questions_per_persona} questions, then "
-            f"thank the presenter and use stop_conversation immediately. "
-            f"Do NOT ask follow-up questions. Do NOT exceed {questions_per_persona} questions total. "
-            f"After your {questions_per_persona}th question is answered, say 'Thank you' and call stop_conversation."
+            f"\n\nSESSION LENGTH: Ask {questions_per_persona} questions total during this session. "
+            f"After the presenter answers your {questions_per_persona}rd question, "
+            f"thank them briefly and end the session."
         )
 
         per_persona_prompt = build_qa_system_prompt(
@@ -640,8 +647,9 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
             hooks=[time_guard],
         )
 
-        # Fresh input/output per persona — input start() triggers the agent
-        ws_input = WebSocketBidiInput(websocket, time_guard=time_guard)
+        # Fresh input/output per persona
+        # In multi-persona mode, ignore 'end' actions from the client mid-session
+        ws_input = WebSocketBidiInput(websocket, time_guard=time_guard, ignore_end=True)
         ws_output = WebSocketBidiOutput(websocket)
 
         try:

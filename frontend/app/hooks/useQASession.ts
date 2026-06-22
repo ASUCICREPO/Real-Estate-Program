@@ -80,6 +80,12 @@ export function useQASession(
         startTimerRef.current?.();
         break;
 
+      case 'persona_switch':
+        // Multi-persona: update displayed persona name when switching
+        setPersonaName((event.persona_name as string) || '');
+        setAgentState('listening');
+        break;
+
       case 'audio':
         if (event.data && !endingRef.current) {
           const pcmBytes = Uint8Array.from(atob(event.data as string), c => c.charCodeAt(0));
