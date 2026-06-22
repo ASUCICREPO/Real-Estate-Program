@@ -9,6 +9,7 @@ export interface QAWebSocketConfig {
   dateStr: string;
   voiceId?: string;
   previousContext?: string;  // Q&A context from prior persona sessions
+  qaTimeLimitSec?: number;   // Override QA duration (frontend-set)
   getIdToken: () => Promise<string>;
 }
 
@@ -86,6 +87,7 @@ export class QAWebSocketClient {
             dateStr: this.config.dateStr,
             voiceId: this.config.voiceId ?? 'matthew',
             previousContext: this.config.previousContext || '',
+            qaTimeLimitSec: this.config.qaTimeLimitSec || 0,
           });
           resolve();
         };

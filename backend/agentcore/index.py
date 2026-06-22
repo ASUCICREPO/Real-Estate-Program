@@ -553,6 +553,7 @@ async def websocket_handler(websocket, context: RequestContext):
     voice_id = raw.get("voiceId", DEFAULT_VOICE_ID)
     session_id = raw.get("sessionId", "") or (context.session_id or "")
     previous_context = raw.get("previousContext", "")  # Context from prior persona sessions
+    qa_time_limit_override = int(raw.get("qaTimeLimitSec", 0))  # Client-side override
 
     print(f"[WebSocket] Setup: user={user_id} persona={persona_id} session={session_id}", flush=True)
 
@@ -581,7 +582,7 @@ async def websocket_handler(websocket, context: RequestContext):
         if not transcript_text:
             transcript_text = "No presentation transcript available."
 
-        session_duration = int(persona_data.get('qaTimeLimitSec', 300))
+        session_duration = qa_time_limit_override if qa_time_limit_override > 0 else int(persona_data.get('qaTimeLimitSec', 300))
 
         system_prompt = build_qa_system_prompt(
             persona_name=persona_data.get('name', 'Stakeholder'),

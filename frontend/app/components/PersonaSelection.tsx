@@ -242,6 +242,36 @@ export default function PersonaSelection({
                         value={baselineOverride}
                         onChange={onBaselineOverrideChange}
                       />
+                      {/* Q&A Duration Override */}
+                      <div className="rounded-xl border border-gray-200 bg-white">
+                        <div className="px-5 py-4 2xl:px-8 2xl:py-6">
+                          <h4 className="text-sm font-medium text-gray-700 2xl:text-xl">Q&A Session Duration</h4>
+                          <p className="mt-0.5 text-xs text-gray-500 2xl:text-sm">How long each persona&apos;s Q&A will last.</p>
+                        </div>
+                        <div className="border-t border-gray-100 px-5 py-5 2xl:px-8 2xl:py-6">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-sm font-medium text-gray-700 2xl:text-base">Duration</label>
+                            <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700 tabular-nums 2xl:text-sm">
+                              {Math.round((persona.qaTimeLimitSec ?? 300) / 60)} min
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={60}
+                            max={900}
+                            step={30}
+                            value={persona.qaTimeLimitSec ?? 300}
+                            onChange={(e) => onQATimeLimitChange(Number(e.target.value))}
+                            className="w-full accent-maroon h-1.5 rounded-full appearance-none bg-gray-200 cursor-pointer"
+                            aria-label="Q&A Duration"
+                          />
+                          <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1 2xl:text-xs">
+                            <span>1 min</span>
+                            <span>default: {Math.round((persona.qaTimeLimitSec ?? 300) / 60)} min</span>
+                            <span>15 min</span>
+                          </div>
+                        </div>
+                      </div>
                       <RealtimeFeedbackToggle
                         value={realtimeFeedbackDefault}
                         onChange={onRealtimeFeedbackDefaultChange}

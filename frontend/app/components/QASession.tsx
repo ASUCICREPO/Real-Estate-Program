@@ -81,9 +81,10 @@ function SinglePersonaSession({
       dateStr,
       voiceId,
       previousContext,
+      qaTimeLimitSec,
       getIdToken,
     }),
-    [personaId, sessionId, userId, dateStr, voiceId, previousContext, getIdToken],
+    [personaId, sessionId, userId, dateStr, voiceId, previousContext, qaTimeLimitSec, getIdToken],
   );
 
   const qa = useQASession(wsConfig, getIdToken, qaTimeLimitSec);
