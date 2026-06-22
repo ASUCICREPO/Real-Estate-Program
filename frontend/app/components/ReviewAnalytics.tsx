@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SessionAnalytics } from '../hooks/useSessionAnalytics';
-import { AIFeedbackResponse, QAAnalyticsResponse, getVideoPlaybackUrl, getPresentationPdfUrl, fetchTranscript, uploadReportPdf } from '../services/api';
+import { AIFeedbackResponse, QAAnalyticsResponse, MultiPersonaQAResult, getVideoPlaybackUrl, getPresentationPdfUrl, fetchTranscript, uploadReportPdf } from '../services/api';
 import {
   Download,
   TrendingUp,
@@ -43,6 +43,7 @@ interface ReviewAnalyticsProps {
   sessionData: SessionAnalytics;
   aiFeedback: AIFeedbackResponse | null;
   qaAnalytics: QAAnalyticsResponse | null;
+  multiPersonaQA?: MultiPersonaQAResult | null;
   persona: Persona | null;
   /** Per-session override of persona best-practice thresholds. */
   bestPracticesOverride?: Partial<PersonaBestPractices> | null;
@@ -134,7 +135,7 @@ function MetricBar({ value, max, color }: { value: number; max: number; color: s
   );
 }
 
-export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, persona, bestPracticesOverride, onBackToStart }: ReviewAnalyticsProps) {
+export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, multiPersonaQA, persona, bestPracticesOverride, onBackToStart }: ReviewAnalyticsProps) {
   const { windows } = sessionData;
   const [showWindows, setShowWindows] = useState(false);
   const [dismissedBanner, setDismissedBanner] = useState(false);
@@ -695,67 +696,92 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
         </div>
       )}
 
-      {/* Q&A Session Feedback */}
-      {qaAnalytics?.qaFeedback && (
+      {/* Q&A Session Feedback — supports multi-persona (separate cards per persona) */}
+      {multiPersonaQA && multiPersonaQA.perPersona.length > 0 ? (
+        <div className="mb-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">Q&A Session Feedback <InfoTooltip text="Analysis of your responses during the Q&A session with each stakeholder persona." /></h2>
+          {multiPersonaQA.perPersona.map((pp, pIdx) => (
+            <div key={pIdx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900">{pp.personaName}</h3>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${pp.analytics.qaFeedback.responseQuality === 'Excellent' ? 'bg-green-100 text-green-800' : pp.analytics.qaFeedback.responseQuality === 'Good' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  {pp.analytics.qaFeedback.responseQuality}
+                </span>
+              </div>
+              <p className="mb-4 text-sm leading-relaxed text-gray-700">{pp.analytics.qaFeedback.overallSummary}</p>
+              <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-green-800">Strengths</h4>
+                  <ul className="space-y-2">
+                    {pp.analytics.qaFeedback.strengths.map((s, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-gray-700"><CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" /><span>{s}</span></li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-amber-800">Areas to Improve</h4>
+                  <ul className="space-y-2">
+                    {pp.analytics.qaFeedback.improvements.map((imp, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-gray-700"><AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" /><span>{imp}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              {pp.analytics.qaFeedback.questionBreakdown.length > 0 && (
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">Per-Question Breakdown</h4>
+                  <div className="space-y-2">
+                    {pp.analytics.qaFeedback.questionBreakdown.map((q, i) => (
+                      <div key={i} className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                        <span className={`mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${q.rating === 'Strong' ? 'bg-green-500' : q.rating === 'Adequate' ? 'bg-blue-500' : 'bg-amber-500'}`}>{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900 truncate">{q.question}</span>
+                            <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${q.rating === 'Strong' ? 'bg-green-100 text-green-700' : q.rating === 'Adequate' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{q.rating}</span>
+                          </div>
+                          <p className="mt-0.5 text-xs text-gray-500">{q.note}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-gray-400">Based on {pp.analytics.totalQuestions} question{pp.analytics.totalQuestions !== 1 ? 's' : ''} and {pp.analytics.totalResponses} response{pp.analytics.totalResponses !== 1 ? 's' : ''}</p>
+            </div>
+          ))}
+        </div>
+      ) : qaAnalytics?.qaFeedback ? (
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Q&A Session Feedback <InfoTooltip text="Analysis of your responses during the Q&A session, including quality rating and per-question breakdown." /></h2>
-            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${qaAnalytics.qaFeedback.responseQuality === 'Excellent' ? 'bg-green-100 text-green-800' :
-              qaAnalytics.qaFeedback.responseQuality === 'Good' ? 'bg-blue-100 text-blue-800' :
-                'bg-yellow-100 text-yellow-800'
-              }`}>
-              {qaAnalytics.qaFeedback.responseQuality}
-            </span>
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${qaAnalytics.qaFeedback.responseQuality === 'Excellent' ? 'bg-green-100 text-green-800' : qaAnalytics.qaFeedback.responseQuality === 'Good' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{qaAnalytics.qaFeedback.responseQuality}</span>
           </div>
-
-          <p className="mb-4 text-sm leading-relaxed text-gray-700">
-            {qaAnalytics.qaFeedback.overallSummary}
-          </p>
-
+          <p className="mb-4 text-sm leading-relaxed text-gray-700">{qaAnalytics.qaFeedback.overallSummary}</p>
           <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-green-200 bg-green-50 p-4">
               <h3 className="mb-3 text-sm font-semibold text-green-800">Strengths</h3>
               <ul className="space-y-2">
-                {qaAnalytics.qaFeedback.strengths.map((s, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
-                    <span>{s}</span>
-                  </li>
-                ))}
+                {qaAnalytics.qaFeedback.strengths.map((s, i) => (<li key={i} className="flex gap-2 text-sm text-gray-700"><CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" /><span>{s}</span></li>))}
               </ul>
             </div>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
               <h3 className="mb-3 text-sm font-semibold text-amber-800">Areas to Improve</h3>
               <ul className="space-y-2">
-                {qaAnalytics.qaFeedback.improvements.map((imp, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-700">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
-                    <span>{imp}</span>
-                  </li>
-                ))}
+                {qaAnalytics.qaFeedback.improvements.map((imp, i) => (<li key={i} className="flex gap-2 text-sm text-gray-700"><AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" /><span>{imp}</span></li>))}
               </ul>
             </div>
           </div>
-
           {qaAnalytics.qaFeedback.questionBreakdown.length > 0 && (
             <div>
               <h3 className="mb-2 text-sm font-medium text-gray-700">Per-Question Breakdown</h3>
               <div className="space-y-2">
                 {qaAnalytics.qaFeedback.questionBreakdown.map((q, i) => (
                   <div key={i} className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                    <span className={`mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${q.rating === 'Strong' ? 'bg-green-500' :
-                      q.rating === 'Adequate' ? 'bg-blue-500' : 'bg-amber-500'
-                      }`}>
-                      {i + 1}
-                    </span>
+                    <span className={`mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${q.rating === 'Strong' ? 'bg-green-500' : q.rating === 'Adequate' ? 'bg-blue-500' : 'bg-amber-500'}`}>{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900 truncate">{q.question}</span>
-                        <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${q.rating === 'Strong' ? 'bg-green-100 text-green-700' :
-                          q.rating === 'Adequate' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                          {q.rating}
-                        </span>
+                        <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${q.rating === 'Strong' ? 'bg-green-100 text-green-700' : q.rating === 'Adequate' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{q.rating}</span>
                       </div>
                       <p className="mt-0.5 text-xs text-gray-500">{q.note}</p>
                     </div>
@@ -764,12 +790,9 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
               </div>
             </div>
           )}
-
-          <p className="mt-3 text-xs text-gray-400">
-            Based on {qaAnalytics.totalQuestions} question{qaAnalytics.totalQuestions !== 1 ? 's' : ''} and {qaAnalytics.totalResponses} response{qaAnalytics.totalResponses !== 1 ? 's' : ''}
-          </p>
+          <p className="mt-3 text-xs text-gray-400">Based on {qaAnalytics.totalQuestions} question{qaAnalytics.totalQuestions !== 1 ? 's' : ''} and {qaAnalytics.totalResponses} response{qaAnalytics.totalResponses !== 1 ? 's' : ''}</p>
         </div>
-      )}
+      ) : null}
 
       {/* Timestamped Feedback — removed, now in video+feedback section above */}
 

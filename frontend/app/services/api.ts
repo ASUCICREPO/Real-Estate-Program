@@ -52,6 +52,20 @@ export interface QAAnalyticsResponse {
   model: string;
 }
 
+/** Per-persona QA analytics for multi-persona sessions */
+export interface PerPersonaQAAnalytics {
+  personaName: string;
+  personaId: string;
+  analytics: QAAnalyticsResponse;
+}
+
+/** Combined result from multi-persona QA sessions */
+export interface MultiPersonaQAResult {
+  perPersona: PerPersonaQAAnalytics[];
+  /** Last persona's analytics (for backwards compatibility with single-persona) */
+  combined: QAAnalyticsResponse | null;
+}
+
 /** Normalize QAFeedback fields that the LLM may return as strings instead of arrays. */
 export function normalizeQAFeedback(res: QAAnalyticsResponse): QAAnalyticsResponse {
   const fb = res.qaFeedback;

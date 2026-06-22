@@ -15,7 +15,7 @@ import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import ConfirmSignUpPage from './components/ConfirmSignUpPage';
 import { SessionAnalytics } from './hooks/useSessionAnalytics';
-import { AIFeedbackResponse, QAAnalyticsResponse, fetchQAAnalytics } from './services/api';
+import { AIFeedbackResponse, QAAnalyticsResponse, MultiPersonaQAResult, fetchQAAnalytics } from './services/api';
 import { generateSessionId, Persona, PersonaBestPractices, ANALYSIS_CONFIG, resolveEffectiveBestPractices } from './config/config';
 import { Loader2 } from 'lucide-react';
 
@@ -59,6 +59,7 @@ export default function Home() {
   const [sessionData, setSessionData] = useState<SessionAnalytics | null>(null);
   const [aiFeedback, setAiFeedback] = useState<AIFeedbackResponse | null>(null);
   const [qaAnalytics, setQaAnalytics] = useState<QAAnalyticsResponse | null>(null);
+  const [multiPersonaQA, setMultiPersonaQA] = useState<MultiPersonaQAResult | null>(null);
 
   // Background analytics tracking
   const analyticsPromiseRef = useRef<Promise<AIFeedbackResponse | null> | null>(null);
@@ -203,6 +204,10 @@ export default function Home() {
     didQASessionRef.current = true;
     qaAnalyticsPromiseRef.current = qaPromise;
     resolveAnalyticsAndShow();
+  };
+
+  const handleMultiPersonaQAComplete = (result: MultiPersonaQAResult) => {
+    setMultiPersonaQA(result);
   };
 
   const handleQASkip = () => {
@@ -363,6 +368,7 @@ export default function Home() {
             qaTimeLimitSec={selectedPersonaQATimeLimit}
             onBack={handleBackToPractice}
             onComplete={handleQAComplete}
+            onMultiPersonaComplete={handleMultiPersonaQAComplete}
             onSkip={handleQASkip}
           />
         )}
@@ -409,6 +415,7 @@ export default function Home() {
             sessionData={sessionData}
             aiFeedback={aiFeedback}
             qaAnalytics={qaAnalytics}
+            multiPersonaQA={multiPersonaQA}
             persona={selectedPersonaData}
             bestPracticesOverride={baselineOverride}
             onBackToStart={handleBackToStart}

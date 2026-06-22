@@ -4,7 +4,7 @@ import React, { useMemo, useEffect, useRef, useCallback, useState } from 'react'
 import { ArrowLeft, AlertCircle, MessageSquareText, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useQASession } from '../hooks/useQASession';
 import { QAWebSocketConfig, QATranscriptEntry } from '../services/websocket';
-import { QAAnalyticsResponse } from '../services/api';
+import { QAAnalyticsResponse, PerPersonaQAAnalytics, MultiPersonaQAResult } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { QA_SESSION_CONFIG, DEFAULT_QA_TIME_LIMIT_SEC, Persona } from '../config/config';
 import QACameraView from './qa/QACameraView';
@@ -22,6 +22,7 @@ interface QASessionProps {
   qaTimeLimitSec?: number;
   onBack: () => void;
   onComplete: (qaPromise: Promise<QAAnalyticsResponse | null>) => void;
+  onMultiPersonaComplete?: (result: MultiPersonaQAResult) => void;
   onSkip: () => void;
 }
 
@@ -335,6 +336,7 @@ export default function QASession({
   qaTimeLimitSec,
   onBack,
   onComplete,
+  onMultiPersonaComplete,
   onSkip,
 }: QASessionProps) {
   const durationSec = qaTimeLimitSec ?? DEFAULT_QA_TIME_LIMIT_SEC;
@@ -351,7 +353,7 @@ export default function QASession({
   const [currentPersonaIndex, setCurrentPersonaIndex] = useState(0);
   const [showTransition, setShowTransition] = useState(false);
   const [allTranscripts, setAllTranscripts] = useState<QATranscriptEntry[]>([]);
-  const [lastAnalytics, setLastAnalytics] = useState<QAAnalyticsResponse | null>(null);
+  const [perPersonaAnalytics, setPerPersonaAnalytics] = useState<PerPersonaQAAnalytics[]>([]);
 
   // Get persona name for a given index
   const getPersonaName = useCallback((index: number) => {
@@ -402,11 +404,29 @@ export default function QASession({
   // Handle a single persona session completing
   const handlePersonaEnd = (analytics: QAAnalyticsResponse | null, transcript: QATranscriptEntry[]) => {
     setAllTranscripts(prev => [...prev, ...transcript]);
-    setLastAnalytics(analytics);
+
+    // Store this persona's analytics
+    const thisPersonaAnalytics: PerPersonaQAAnalytics | null = analytics ? {
+      personaName: getPersonaName(currentPersonaIndex),
+      personaId: allPersonaIds[currentPersonaIndex],
+      analytics,
+    } : null;
+
+    const updatedAnalytics = thisPersonaAnalytics
+      ? [...perPersonaAnalytics, thisPersonaAnalytics]
+      : perPersonaAnalytics;
+    setPerPersonaAnalytics(updatedAnalytics);
 
     // If this was the last persona, complete the whole session
     if (currentPersonaIndex >= allPersonaIds.length - 1) {
-      // Use the last analytics as the combined result
+      const result: MultiPersonaQAResult = {
+        perPersona: updatedAnalytics,
+        combined: analytics,  // Last persona for backwards compat
+      };
+      if (onMultiPersonaComplete) {
+        onMultiPersonaComplete(result);
+      }
+      // Also call onComplete with last analytics for backwards compat
       onComplete(Promise.resolve(analytics));
     } else {
       // Show transition screen before next persona
@@ -420,8 +440,14 @@ export default function QASession({
   };
 
   const handleSkipAll = () => {
-    // Complete with whatever analytics we have so far
-    onComplete(Promise.resolve(lastAnalytics));
+    const result: MultiPersonaQAResult = {
+      perPersona: perPersonaAnalytics,
+      combined: perPersonaAnalytics.length > 0 ? perPersonaAnalytics[perPersonaAnalytics.length - 1].analytics : null,
+    };
+    if (onMultiPersonaComplete) {
+      onMultiPersonaComplete(result);
+    }
+    onComplete(Promise.resolve(result.combined));
   };
 
   // Show transition screen between personas
