@@ -583,7 +583,6 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
     """
     all_transcript_entries = []
     client_disconnected = False
-    questions_per_persona = 3  # Hard cap per persona to ensure rotation
 
     for persona_idx, current_persona in enumerate(all_personas):
         if client_disconnected:
@@ -593,50 +592,37 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
         persona_voice_id = current_persona.get('voiceId', DEFAULT_VOICE_ID)
         per_persona_duration = session_duration // len(all_personas)
 
-        # Build prompt with context from previous rounds AND a strict question limit
+        # Build prompt with context from previous rounds
         prev_context = ""
         if all_transcript_entries:
             prev_context = "\n\nPREVIOUS Q&A (already asked — do NOT repeat these topics):\n" + "\n".join(
                 f"{'Q' if e['role'] == 'assistant' else 'A'}: {e['text']}" for e in all_transcript_entries[-10:]
             )
 
-        # Inject question limit into custom instructions
-        question_limit_instruction = (
-            f"\n\nSESSION LENGTH: Ask {questions_per_persona} questions total during this session. "
-            f"After the presenter answers your {questions_per_persona}rd question, "
-            f"thank them briefly and end the session."
-        )
-
         per_persona_prompt = build_qa_system_prompt(
             persona_name=persona_name,
             persona_prompt=current_persona.get('personaPrompt', ''),
-            custom_instructions=current_persona.get('description', '') + prev_context + question_limit_instruction,
+            custom_instructions=current_persona.get('description', '') + prev_context,
             transcript_text=transcript_text,
             session_duration=per_persona_duration,
         )
 
-        # Notify client of persona switch
-        try:
-            await websocket.send_json({
-                "type": "persona_switch",
-                "persona_name": persona_name,
-                "persona_index": persona_idx,
-                "total_personas": len(all_personas),
-            })
-        except (WebSocketDisconnect, Exception):
-            client_disconnected = True
-            break
-
-        print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id}, limit: {questions_per_persona}q/{per_persona_duration}s)", flush=True)
-
+        # Notify client of persona switch (only for 2nd+ personas)
         if persona_idx > 0:
-            # Brief pause — tell client to keep mic open
             try:
+                await websocket.send_json({
+                    "type": "persona_switch",
+                    "persona_name": persona_name,
+                    "persona_index": persona_idx,
+                    "total_personas": len(all_personas),
+                })
                 await websocket.send_json({"type": "transcript", "role": "assistant", "text": f"[Switching to {persona_name}...]", "is_partial": False})
                 await asyncio.sleep(2)
             except (WebSocketDisconnect, Exception):
                 client_disconnected = True
                 break
+
+        print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id}, duration: {per_persona_duration}s)", flush=True)
 
         model = create_nova_sonic_model(persona_voice_id)
         time_guard = SessionTimeGuard(per_persona_duration)
@@ -795,6 +781,11 @@ async def websocket_handler(websocket, context: RequestContext):
             )
         else:
             # MULTI-PERSONA: Sequential BidiAgent sessions with different voices
+            await websocket.send_json({
+                "type": "session_started",
+                "persona_name": persona_data.get('name', 'Stakeholder'),
+                "session_id": session_id,
+            })
             await run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, persona_data)
             return  # Sequential handler manages its own cleanup
 
