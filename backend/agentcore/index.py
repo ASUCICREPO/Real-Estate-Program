@@ -563,6 +563,104 @@ async def save_qa_analytics(user_id: str, session_id: str, transcript_entries: l
         )
 
 
+# ── Sequential multi-persona handler ─────────────────────────────────
+
+async def run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, primary_persona):
+    """Run sequential BidiAgent sessions — one per persona with their own voice."""
+    all_transcript_entries = []
+    client_disconnected = False
+    questions_per_persona = 4
+
+    for persona_idx, current_persona in enumerate(all_personas):
+        if client_disconnected:
+            break
+
+        persona_name = current_persona.get('name', 'Stakeholder')
+        persona_voice_id = current_persona.get('voiceId', DEFAULT_VOICE_ID)
+        per_persona_duration = session_duration // len(all_personas)
+
+        # Build prompt with context from previous rounds
+        prev_context = ""
+        if all_transcript_entries:
+            prev_context = "\n\nPREVIOUS Q&A (already asked — do NOT repeat these topics):\n" + "\n".join(
+                f"{'Q' if e['role'] == 'assistant' else 'A'}: {e['text']}" for e in all_transcript_entries[-10:]
+            )
+
+        per_persona_prompt = build_qa_system_prompt(
+            persona_name=persona_name,
+            persona_prompt=current_persona.get('personaPrompt', ''),
+            custom_instructions=current_persona.get('description', '') + prev_context,
+            transcript_text=transcript_text,
+            session_duration=per_persona_duration,
+        )
+
+        # Notify client of persona switch
+        await websocket.send_json({
+            "type": "persona_switch",
+            "persona_name": persona_name,
+            "persona_index": persona_idx,
+            "total_personas": len(all_personas),
+        })
+
+        print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id})", flush=True)
+
+        if persona_idx > 0:
+            await asyncio.sleep(1.5)
+
+        model = create_nova_sonic_model(persona_voice_id)
+        time_guard = SessionTimeGuard(per_persona_duration)
+        agent = BidiAgent(
+            model=model,
+            tools=[stop_conversation],
+            system_prompt=per_persona_prompt,
+            hooks=[time_guard],
+        )
+
+        ws_input = WebSocketBidiInput(websocket, time_guard=time_guard)
+        ws_output = WebSocketBidiOutput(websocket)
+
+        try:
+            await agent.run(inputs=[ws_input], outputs=[ws_output])
+        except WebSocketDisconnect:
+            client_disconnected = True
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            print(f"[MultiPersona] Agent error for {persona_name}: {e}", flush=True)
+        finally:
+            try:
+                await agent.stop()
+            except Exception:
+                pass
+
+        all_transcript_entries.extend(ws_output.transcript_entries)
+
+    # Generate combined analytics
+    if all_transcript_entries and not client_disconnected:
+        try:
+            feedback = await generate_qa_analytics(all_transcript_entries, primary_persona)
+            total_q = sum(1 for e in all_transcript_entries if e['role'] == 'assistant')
+            total_r = sum(1 for e in all_transcript_entries if e['role'] == 'user')
+            await websocket.send_json({
+                "type": "qa_analytics",
+                "qaFeedback": feedback,
+                "totalQuestions": total_q,
+                "totalResponses": total_r,
+            })
+            await save_qa_analytics(user_id, session_id, all_transcript_entries, feedback)
+        except Exception as e:
+            print(f"[MultiPersona] Analytics error: {e}", flush=True)
+
+    try:
+        await websocket.send_json({"type": "session_ended", "reason": "server_complete"})
+    except Exception:
+        pass
+    try:
+        await websocket.close()
+    except Exception:
+        pass
+
+
 # ── App and WebSocket handler ────────────────────────────────────────
 
 app = BedrockAgentCoreApp()
@@ -657,7 +755,9 @@ async def websocket_handler(websocket, context: RequestContext):
                 session_duration=session_duration,
             )
         else:
-            system_prompt = build_panel_system_prompt(all_personas, transcript_text, session_duration)
+            # MULTI-PERSONA: Sequential BidiAgent sessions with different voices
+            await run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, persona_data)
+            return  # Sequential handler manages its own cleanup
 
         # Use persona-specific voice if available, otherwise client-provided or default
         persona_voice = persona_data.get('voiceId', None)
