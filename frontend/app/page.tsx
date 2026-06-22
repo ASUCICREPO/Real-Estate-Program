@@ -296,132 +296,134 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <Header currentStep={currentStep} onStepClick={handleStepClick} sessionId={sessionId} onTutorialOpen={() => setIsTutorialOpen(true)} showStepper={true} onSessionHistoryOpen={() => setIsSessionHistoryOpen(true)} />
 
-        <div key={currentStep} className="animate-step-enter">
-          {currentStep === 1 && (
-            <PersonaSelection
-              selectedPersona={selectedPersona}
-              onSelectPersona={handlePersonaSelect}
-              onPersonaNameChange={setSelectedPersonaName}
-              onTimeLimitChange={setSelectedPersonaTimeLimit}
-              onQATimeLimitChange={setSelectedPersonaQATimeLimit}
-              onPersonaDataChange={setSelectedPersonaData}
-              additionalPersonas={additionalPersonas}
-              onAdditionalPersonasChange={setAdditionalPersonas}
-              customNotes={customNotes}
-              onCustomNotesChange={setCustomNotes}
-              baselineOverride={baselineOverride}
-              onBaselineOverrideChange={setBaselineOverride}
-              realtimeFeedbackDefault={realtimeFeedbackDefault}
-              onRealtimeFeedbackDefaultChange={setRealtimeFeedbackDefault}
-              sessionId={sessionId}
-              onContinue={handleContinueToUpload}
-            />
-          )}
+      <div key={currentStep} className="animate-step-enter">
+        {currentStep === 1 && (
+          <PersonaSelection
+            selectedPersona={selectedPersona}
+            onSelectPersona={handlePersonaSelect}
+            onPersonaNameChange={setSelectedPersonaName}
+            onTimeLimitChange={setSelectedPersonaTimeLimit}
+            onQATimeLimitChange={setSelectedPersonaQATimeLimit}
+            onPersonaDataChange={setSelectedPersonaData}
+            additionalPersonas={additionalPersonas}
+            onAdditionalPersonasChange={setAdditionalPersonas}
+            customNotes={customNotes}
+            onCustomNotesChange={setCustomNotes}
+            baselineOverride={baselineOverride}
+            onBaselineOverrideChange={setBaselineOverride}
+            realtimeFeedbackDefault={realtimeFeedbackDefault}
+            onRealtimeFeedbackDefaultChange={setRealtimeFeedbackDefault}
+            sessionId={sessionId}
+            onContinue={handleContinueToUpload}
+          />
+        )}
 
-          {currentStep === 2 && (
-            <UploadContent
-              personaName={selectedPersonaName}
-              personaId={selectedPersona || undefined}
-              sessionId={sessionId}
-              initialFileName={uploadedFileName}
-              initialUploaded={pdfUploaded}
-              onBack={handleBackToPersona}
-              onContinue={handleContinueFromUpload}
-              onPdfUploaded={(fileName) => {
-                setPdfUploaded(true);
-                setUploadedFileName(fileName);
-              }}
-            />
-          )}
+        {currentStep === 2 && (
+          <UploadContent
+            personaName={selectedPersonaName}
+            personaId={selectedPersona || undefined}
+            sessionId={sessionId}
+            initialFileName={uploadedFileName}
+            initialUploaded={pdfUploaded}
+            onBack={handleBackToPersona}
+            onContinue={handleContinueFromUpload}
+            onPdfUploaded={(fileName) => {
+              setPdfUploaded(true);
+              setUploadedFileName(fileName);
+            }}
+          />
+        )}
 
-          {currentStep === 3 && (
-            <PracticeSession
-              personaTitle={selectedPersonaName}
-              personaId={selectedPersona ?? ''}
-              sessionId={sessionId}
-              timeLimitSec={selectedPersonaTimeLimit}
-              hasPresentationPdf={pdfUploaded}
-              hasPersonaCustomization={customNotes.trim().length > 0}
-              bestPracticesOverride={baselineOverride}
-              effectiveBestPractices={resolveEffectiveBestPractices(selectedPersonaData, baselineOverride)}
-              realtimeFeedbackDefault={realtimeFeedbackDefault}
-              onBack={handleBackToUpload}
-              onComplete={handlePracticeComplete}
-              exitSessionRef={exitSessionRef}
-            />
-          )}
+        {currentStep === 3 && (
+          <PracticeSession
+            personaTitle={selectedPersonaName}
+            personaId={selectedPersona ?? ''}
+            sessionId={sessionId}
+            timeLimitSec={selectedPersonaTimeLimit}
+            hasPresentationPdf={pdfUploaded}
+            hasPersonaCustomization={customNotes.trim().length > 0}
+            bestPracticesOverride={baselineOverride}
+            effectiveBestPractices={resolveEffectiveBestPractices(selectedPersonaData, baselineOverride)}
+            realtimeFeedbackDefault={realtimeFeedbackDefault}
+            onBack={handleBackToUpload}
+            onComplete={handlePracticeComplete}
+            exitSessionRef={exitSessionRef}
+          />
+        )}
 
-          {currentStep === 4 && (
-            <QASession
-              personaId={selectedPersona || ''}
-              personaIds={additionalPersonas.length > 0 ? [selectedPersona || '', ...additionalPersonas.map(p => p.personaID)] : undefined}
-              personaName={selectedPersonaName}
-              sessionId={sessionId}
-              userId={userId || ''}
-              qaTimeLimitSec={selectedPersonaQATimeLimit}
-              onBack={handleBackToPractice}
-              onComplete={handleQAComplete}
-              onSkip={handleQASkip}
-            />
-          )}
+        {currentStep === 4 && (
+          <QASession
+            personaId={selectedPersona || ''}
+            personaIds={additionalPersonas.length > 0 ? [selectedPersona || '', ...additionalPersonas.map(p => p.personaID)] : undefined}
+            personaName={selectedPersonaName}
+            personaNames={additionalPersonas.length > 0 ? [selectedPersonaName, ...additionalPersonas.map(p => p.name)] : undefined}
+            personas={additionalPersonas.length > 0 ? [selectedPersonaData as Persona, ...additionalPersonas] : undefined}
+            sessionId={sessionId}
+            userId={userId || ''}
+            qaTimeLimitSec={selectedPersonaQATimeLimit}
+            onBack={handleBackToPractice}
+            onComplete={handleQAComplete}
+            onSkip={handleQASkip}
+          />
+        )}
 
-          {currentStep === 5 && isWaitingForAnalytics && (
-            <div className="flex min-h-[70vh] items-center justify-center px-4">
-              <div className="mx-auto max-w-md text-center">
-                <div className="relative mx-auto mb-8 h-24 w-24">
-                  <div className="absolute inset-0 animate-ping rounded-full bg-maroon-200 opacity-20" />
-                  <div className="absolute inset-2 animate-pulse rounded-full bg-maroon-100 opacity-40" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <svg
-                      className="h-12 w-12 animate-spin text-maroon-600"
-                      viewBox="0 0 48 48"
-                      fill="none"
-                    >
-                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="80 40" opacity="0.3" />
-                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="30 90" />
-                    </svg>
-                  </div>
-                </div>
-
-                <h2 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-3xl">
-                  Processing Your Session
-                </h2>
-                <div className="relative mt-3 h-8 overflow-hidden">
-                  <p
-                    key={processingPhase}
-                    className="animate-fade-in text-sm text-gray-500 font-sans leading-relaxed sm:text-base 2xl:text-lg"
+        {currentStep === 5 && isWaitingForAnalytics && (
+          <div className="flex min-h-[70vh] items-center justify-center px-4">
+            <div className="mx-auto max-w-md text-center">
+              <div className="relative mx-auto mb-8 h-24 w-24">
+                <div className="absolute inset-0 animate-ping rounded-full bg-maroon-200 opacity-20" />
+                <div className="absolute inset-2 animate-pulse rounded-full bg-maroon-100 opacity-40" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg
+                    className="h-12 w-12 animate-spin text-maroon-600"
+                    viewBox="0 0 48 48"
+                    fill="none"
                   >
-                    {PROCESSING_PHASES[processingPhase]}
-                  </p>
+                    <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="80 40" opacity="0.3" />
+                    <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="30 90" />
+                  </svg>
                 </div>
+              </div>
 
-                <p className="mt-8 text-xs text-gray-400 font-sans 2xl:text-sm">
-                  Please don&apos;t close this tab while processing.
+              <h2 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-3xl">
+                Processing Your Session
+              </h2>
+              <div className="relative mt-3 h-8 overflow-hidden">
+                <p
+                  key={processingPhase}
+                  className="animate-fade-in text-sm text-gray-500 font-sans leading-relaxed sm:text-base 2xl:text-lg"
+                >
+                  {PROCESSING_PHASES[processingPhase]}
                 </p>
               </div>
-            </div>
-          )}
 
-          {currentStep === 5 && !isWaitingForAnalytics && sessionData && (
-            <ReviewAnalytics
-              sessionData={sessionData}
-              aiFeedback={aiFeedback}
-              qaAnalytics={qaAnalytics}
-              persona={selectedPersonaData}
-              bestPracticesOverride={baselineOverride}
-              onBackToStart={handleBackToStart}
-            />
-          )}
-
-          {currentStep === 5 && !isWaitingForAnalytics && !sessionData && (
-            <div className="flex min-h-[60vh] items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900 font-serif">Review Analytics</h2>
-                <p className="mt-2 text-gray-500 font-sans">No session data available</p>
-              </div>
+              <p className="mt-8 text-xs text-gray-400 font-sans 2xl:text-sm">
+                Please don&apos;t close this tab while processing.
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {currentStep === 5 && !isWaitingForAnalytics && sessionData && (
+          <ReviewAnalytics
+            sessionData={sessionData}
+            aiFeedback={aiFeedback}
+            qaAnalytics={qaAnalytics}
+            persona={selectedPersonaData}
+            bestPracticesOverride={baselineOverride}
+            onBackToStart={handleBackToStart}
+          />
+        )}
+
+        {currentStep === 5 && !isWaitingForAnalytics && !sessionData && (
+          <div className="flex min-h-[60vh] items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 font-serif">Review Analytics</h2>
+              <p className="mt-2 text-gray-500 font-sans">No session data available</p>
+            </div>
+          </div>
+        )}
+      </div>
 
 
 

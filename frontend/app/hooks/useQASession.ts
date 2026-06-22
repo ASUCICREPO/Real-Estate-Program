@@ -82,6 +82,7 @@ export function useQASession(
 
       case 'persona_switch':
         // Multi-persona: update displayed persona name when switching
+        // (Legacy — multi-persona is now handled by separate connections)
         setPersonaName((event.persona_name as string) || '');
         setAgentState('listening');
         break;

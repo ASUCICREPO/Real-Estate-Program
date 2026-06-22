@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useMemo, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, AlertCircle, MessageSquareText } from 'lucide-react';
+import React, { useMemo, useEffect, useRef, useCallback, useState } from 'react';
+import { ArrowLeft, AlertCircle, MessageSquareText, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useQASession } from '../hooks/useQASession';
-import { QAWebSocketConfig } from '../services/websocket';
+import { QAWebSocketConfig, QATranscriptEntry } from '../services/websocket';
 import { QAAnalyticsResponse } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { QA_SESSION_CONFIG, DEFAULT_QA_TIME_LIMIT_SEC } from '../config/config';
+import { QA_SESSION_CONFIG, DEFAULT_QA_TIME_LIMIT_SEC, Persona } from '../config/config';
 import QACameraView from './qa/QACameraView';
 import QAOrbPanel from './qa/QAOrbPanel';
 
 interface QASessionProps {
   personaId: string;
-  personaIds?: string[];  // Multi-persona panel support
+  personaIds?: string[];  // Multi-persona: list of persona IDs to run sequentially
   personaName: string;
+  personaNames?: string[];  // Display names matching personaIds
+  personas?: Persona[];  // Full persona objects for multi-persona
   sessionId: string;
   userId: string;
   voiceId?: string;
@@ -29,18 +31,37 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function QASession({
+// ── Single-persona session (reusable for both single and multi-persona flows) ──
+
+interface SinglePersonaSessionProps {
+  personaId: string;
+  personaName: string;
+  sessionId: string;
+  userId: string;
+  voiceId?: string;
+  qaTimeLimitSec: number;
+  previousContext?: string;
+  onBack: () => void;
+  onEnd: (analytics: QAAnalyticsResponse | null, transcript: QATranscriptEntry[]) => void;
+  onSkip: () => void;
+  showBackButton?: boolean;
+  panelInfo?: { current: number; total: number };
+}
+
+function SinglePersonaSession({
   personaId,
-  personaIds,
   personaName: initialPersonaName,
   sessionId,
   userId,
   voiceId,
   qaTimeLimitSec,
+  previousContext,
   onBack,
-  onComplete,
+  onEnd,
   onSkip,
-}: QASessionProps) {
+  showBackButton = true,
+  panelInfo,
+}: SinglePersonaSessionProps) {
   const { getIdToken } = useAuth();
   const autoNavigatedRef = useRef(false);
   const wasEverActiveRef = useRef(false);
@@ -54,31 +75,31 @@ export default function QASession({
   const wsConfig = useMemo<QAWebSocketConfig>(
     () => ({
       personaId,
-      personaIds: personaIds && personaIds.length > 0 ? personaIds : undefined,
       sessionId,
       userId,
       dateStr,
       voiceId,
+      previousContext,
       getIdToken,
     }),
-    [personaId, personaIds, sessionId, userId, dateStr, voiceId, getIdToken],
+    [personaId, sessionId, userId, dateStr, voiceId, previousContext, getIdToken],
   );
 
-  const durationSec = qaTimeLimitSec ?? DEFAULT_QA_TIME_LIMIT_SEC;
-  const qa = useQASession(wsConfig, getIdToken, durationSec);
+  const qa = useQASession(wsConfig, getIdToken, qaTimeLimitSec);
   const { endSession } = qa;
   const displayPersonaName = qa.personaName || initialPersonaName;
 
-  const remaining = Math.max(0, durationSec - qa.timer);
+  const remaining = Math.max(0, qaTimeLimitSec - qa.timer);
   const isWarning = remaining <= QA_SESSION_CONFIG.WARNING_AT_SEC;
   const isCritical = remaining <= QA_SESSION_CONFIG.FINAL_WARNING_AT_SEC;
 
   const handleEndSession = useCallback(() => {
     if (autoNavigatedRef.current) return;
     autoNavigatedRef.current = true;
-    const promise = endSession();
-    onComplete(promise);
-  }, [endSession, onComplete]);
+    endSession().then((analytics) => {
+      onEnd(analytics, qa.transcriptEntries);
+    });
+  }, [endSession, onEnd, qa.transcriptEntries]);
 
   useEffect(() => {
     if (qa.status === 'active') wasEverActiveRef.current = true;
@@ -88,12 +109,12 @@ export default function QASession({
     if (qa.status === 'ended' && !autoNavigatedRef.current) {
       autoNavigatedRef.current = true;
       if (wasEverActiveRef.current) {
-        onComplete(Promise.resolve(qa.qaAnalytics));
+        onEnd(qa.qaAnalytics, qa.transcriptEntries);
       } else {
         onSkip();
       }
     }
-  }, [qa.status, qa.qaAnalytics, onComplete, onSkip]);
+  }, [qa.status, qa.qaAnalytics, qa.transcriptEntries, onEnd, onSkip]);
 
   useEffect(() => {
     if (transcriptScrollRef.current) {
@@ -106,19 +127,26 @@ export default function QASession({
       {/* Header */}
       <div className="mb-3 flex items-center justify-between 2xl:mb-6">
         <div className="flex items-start gap-4">
-          <button
-            onClick={onBack}
-            className="group mt-1 flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm transition-all duration-300 ease-out hover:border-maroon-200 hover:bg-maroon-50 hover:text-maroon-700 hover:shadow-md"
-            title="Exit Session"
-          >
-            <ArrowLeft className="w-5 h-5 transition-transform duration-300 ease-out group-hover:-translate-x-1" />
-          </button>
+          {showBackButton && (
+            <button
+              onClick={onBack}
+              className="group mt-1 flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm transition-all duration-300 ease-out hover:border-maroon-200 hover:bg-maroon-50 hover:text-maroon-700 hover:shadow-md"
+              title="Exit Session"
+            >
+              <ArrowLeft className="w-5 h-5 transition-transform duration-300 ease-out group-hover:-translate-x-1" />
+            </button>
+          )}
           <div>
             <h1 className="text-xl font-bold text-gray-900 font-serif italic sm:text-2xl 2xl:text-4xl">
               Q&A Session
             </h1>
             <p className="mt-1 text-sm text-gray-500 font-sans 2xl:text-xl">
               Presenting to: <span className="text-maroon-700 font-medium">{displayPersonaName}</span>
+              {panelInfo && (
+                <span className="ml-2 text-gray-400">
+                  ({panelInfo.current} of {panelInfo.total})
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -201,7 +229,7 @@ export default function QASession({
             </div>
           )}
 
-          {/* Partial user text (typing indicator) — newest, shown at top */}
+          {/* Partial user text */}
           {qa.partialUserText && (
             <div className="flex gap-3 items-start opacity-60">
               <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-gray-400 mt-0.5">
@@ -230,5 +258,202 @@ export default function QASession({
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Multi-persona transition screen ──
+
+interface TransitionScreenProps {
+  completedPersona: string;
+  nextPersona: string;
+  currentIndex: number;
+  totalPersonas: number;
+  onContinue: () => void;
+  onSkipAll: () => void;
+}
+
+function TransitionScreen({ completedPersona, nextPersona, currentIndex, totalPersonas, onContinue, onSkipAll }: TransitionScreenProps) {
+  return (
+    <div className="mx-auto w-full max-w-[800px] px-4 py-12 sm:px-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+          <CheckCircle2 className="h-8 w-8 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 font-serif italic mb-2">
+          Session with {completedPersona} Complete
+        </h2>
+        <p className="text-gray-500 font-sans mb-8">
+          {currentIndex} of {totalPersonas} stakeholders done
+        </p>
+
+        {/* Progress dots */}
+        <div className="flex justify-center gap-2 mb-8">
+          {Array.from({ length: totalPersonas }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-3 w-3 rounded-full transition-colors ${i < currentIndex ? 'bg-green-500' : i === currentIndex ? 'bg-maroon' : 'bg-gray-200'
+                }`}
+            />
+          ))}
+        </div>
+
+        <p className="text-lg text-gray-700 font-sans mb-6">
+          Next: <span className="font-semibold text-maroon-700">{nextPersona}</span>
+        </p>
+
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={onSkipAll}
+            className="px-5 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors font-sans"
+          >
+            Skip Remaining
+          </button>
+          <button
+            onClick={onContinue}
+            className="flex items-center gap-2 rounded-full bg-maroon px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-maroon-700 transition-colors font-sans"
+          >
+            Continue to {nextPersona}
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main QASession component (orchestrates single or multi-persona) ──
+
+export default function QASession({
+  personaId,
+  personaIds,
+  personaName,
+  personaNames,
+  personas,
+  sessionId,
+  userId,
+  voiceId,
+  qaTimeLimitSec,
+  onBack,
+  onComplete,
+  onSkip,
+}: QASessionProps) {
+  const durationSec = qaTimeLimitSec ?? DEFAULT_QA_TIME_LIMIT_SEC;
+
+  // Determine if this is a multi-persona session
+  const allPersonaIds = useMemo(() => {
+    if (personaIds && personaIds.length > 1) return personaIds;
+    return [personaId];
+  }, [personaId, personaIds]);
+
+  const isMultiPersona = allPersonaIds.length > 1;
+
+  // Multi-persona state
+  const [currentPersonaIndex, setCurrentPersonaIndex] = useState(0);
+  const [showTransition, setShowTransition] = useState(false);
+  const [allTranscripts, setAllTranscripts] = useState<QATranscriptEntry[]>([]);
+  const [lastAnalytics, setLastAnalytics] = useState<QAAnalyticsResponse | null>(null);
+
+  // Get persona name for a given index
+  const getPersonaName = useCallback((index: number) => {
+    if (personaNames && personaNames[index]) return personaNames[index];
+    if (personas && personas[index]) return personas[index].name;
+    if (index === 0) return personaName;
+    return `Stakeholder ${index + 1}`;
+  }, [personaName, personaNames, personas]);
+
+  // Get voice ID for a given persona index
+  const getVoiceId = useCallback((index: number) => {
+    if (personas && personas[index] && personas[index].voiceId) {
+      return personas[index].voiceId;
+    }
+    return voiceId;
+  }, [personas, voiceId]);
+
+  // Build previous context string from accumulated transcripts
+  const previousContext = useMemo(() => {
+    if (allTranscripts.length === 0) return undefined;
+    return allTranscripts
+      .slice(-20)  // Last 20 entries max
+      .map(e => `${e.role === 'assistant' ? 'Q' : 'A'}: ${e.text}`)
+      .join('\n');
+  }, [allTranscripts]);
+
+  // ── Single-persona mode ──
+  if (!isMultiPersona) {
+    return (
+      <SinglePersonaSession
+        personaId={personaId}
+        personaName={personaName}
+        sessionId={sessionId}
+        userId={userId}
+        voiceId={voiceId}
+        qaTimeLimitSec={durationSec}
+        onBack={onBack}
+        onEnd={(analytics) => {
+          onComplete(Promise.resolve(analytics));
+        }}
+        onSkip={onSkip}
+      />
+    );
+  }
+
+  // ── Multi-persona mode ──
+
+  // Handle a single persona session completing
+  const handlePersonaEnd = (analytics: QAAnalyticsResponse | null, transcript: QATranscriptEntry[]) => {
+    setAllTranscripts(prev => [...prev, ...transcript]);
+    setLastAnalytics(analytics);
+
+    // If this was the last persona, complete the whole session
+    if (currentPersonaIndex >= allPersonaIds.length - 1) {
+      // Use the last analytics as the combined result
+      onComplete(Promise.resolve(analytics));
+    } else {
+      // Show transition screen before next persona
+      setShowTransition(true);
+    }
+  };
+
+  const handleContinueToNext = () => {
+    setShowTransition(false);
+    setCurrentPersonaIndex(prev => prev + 1);
+  };
+
+  const handleSkipAll = () => {
+    // Complete with whatever analytics we have so far
+    onComplete(Promise.resolve(lastAnalytics));
+  };
+
+  // Show transition screen between personas
+  if (showTransition) {
+    return (
+      <TransitionScreen
+        completedPersona={getPersonaName(currentPersonaIndex)}
+        nextPersona={getPersonaName(currentPersonaIndex + 1)}
+        currentIndex={currentPersonaIndex + 1}
+        totalPersonas={allPersonaIds.length}
+        onContinue={handleContinueToNext}
+        onSkipAll={handleSkipAll}
+      />
+    );
+  }
+
+  // Render current persona's session
+  return (
+    <SinglePersonaSession
+      key={`persona-${currentPersonaIndex}-${allPersonaIds[currentPersonaIndex]}`}
+      personaId={allPersonaIds[currentPersonaIndex]}
+      personaName={getPersonaName(currentPersonaIndex)}
+      sessionId={sessionId}
+      userId={userId}
+      voiceId={getVoiceId(currentPersonaIndex)}
+      qaTimeLimitSec={durationSec}
+      previousContext={previousContext}
+      onBack={onBack}
+      onEnd={handlePersonaEnd}
+      onSkip={onSkip}
+      showBackButton={currentPersonaIndex === 0}
+      panelInfo={{ current: currentPersonaIndex + 1, total: allPersonaIds.length }}
+    />
   );
 }

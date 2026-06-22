@@ -4,11 +4,11 @@ import { getAwsCredentials } from './awsCredentials';
 
 export interface QAWebSocketConfig {
   personaId: string;
-  personaIds?: string[];  // Multi-persona panel support
   sessionId: string;
   userId: string;
   dateStr: string;
   voiceId?: string;
+  previousContext?: string;  // Q&A context from prior persona sessions
   getIdToken: () => Promise<string>;
 }
 
@@ -81,11 +81,11 @@ export class QAWebSocketClient {
           this.send({
             action: 'setup',
             personaId: this.config.personaId,
-            personaIds: this.config.personaIds || [this.config.personaId],
             userId: this.config.userId,
             sessionId: this.config.sessionId,
             dateStr: this.config.dateStr,
             voiceId: this.config.voiceId ?? 'matthew',
+            previousContext: this.config.previousContext || '',
           });
           resolve();
         };

@@ -69,6 +69,7 @@ export interface Persona {
   communicationStyle: string;
   timeLimitSec?: number;
   qaTimeLimitSec?: number;
+  voiceId?: string;
   bestPractices?: PersonaBestPractices;
   scoringWeights?: PersonaScoringWeights;
 }

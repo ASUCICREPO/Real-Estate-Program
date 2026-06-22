@@ -85,7 +85,7 @@ async def apply_guardrail_to_text(text: str, source: Literal['INPUT', 'OUTPUT'])
 
 # ── System prompt builder ────────────────────────────────────────────
 
-def build_qa_system_prompt(persona_name, persona_prompt, custom_instructions, transcript_text, session_duration):
+def build_qa_system_prompt(persona_name, persona_prompt, custom_instructions, transcript_text, session_duration, previous_qa_context=None):
     """Build QA system prompt from persona and presentation context."""
     qa_duration = session_duration // 60
     if qa_duration <= 0:
@@ -94,73 +94,22 @@ def build_qa_system_prompt(persona_name, persona_prompt, custom_instructions, tr
     with open("qa_system_prompt.jinja2", "r") as f:
         template_file = f.read()
     template = Template(template_file)
+
+    # Append previous Q&A context to custom instructions if provided
+    full_custom_instructions = custom_instructions or ""
+    if previous_qa_context:
+        full_custom_instructions += (
+            "\n\nPREVIOUS Q&A (already asked by other stakeholders — do NOT repeat these topics):\n"
+            + previous_qa_context
+        )
+
     prompt = template.render(
         persona_name=persona_name,
         persona_prompt=persona_prompt,
-        custom_instructions=custom_instructions if custom_instructions else None,
+        custom_instructions=full_custom_instructions if full_custom_instructions else None,
         transcript_text=transcript_text,
         qa_limit=qa_duration,
     )
-    return prompt
-
-
-def build_panel_system_prompt(personas: list, transcript_text: str, session_duration: int) -> str:
-    """Build a combined panel system prompt for multi-persona Q&A."""
-    qa_duration = session_duration // 60
-    if qa_duration <= 0:
-        qa_duration = 1
-
-    persona_descriptions = []
-    for p in personas:
-        persona_descriptions.append(
-            f"- **{p.get('name', 'Stakeholder')}**: {p.get('personaPrompt', p.get('description', ''))}"
-        )
-
-    personas_text = "\n".join(persona_descriptions)
-    num_personas = len(personas)
-    questions_per_persona = 4
-    total_questions = questions_per_persona * num_personas
-
-    prompt = f"""You are conducting a focused panel Q&A with {num_personas} stakeholders. This is NOT an exhaustive interrogation — it is a brief, pointed session with exactly {total_questions} questions total.
-
-PANEL MEMBERS:
-{personas_text}
-
-STRICT RULES:
-1. Ask EXACTLY {total_questions} questions total ({questions_per_persona} per persona), then END the session
-2. ALTERNATE between personas — never two questions from the same perspective in a row
-3. Identify who is speaking each time (e.g., "As your lender..." or "From an investor standpoint...")
-4. ONE short, focused question per turn — no multi-part questions
-5. Listen to the full answer before asking the next question
-6. After all {total_questions} questions are answered, thank the presenter briefly and use stop_conversation immediately
-7. Do NOT ask follow-up questions or bonus questions — stick to {total_questions} total
-
-QUESTION SELECTION — pick the single most critical question per round:
-"""
-
-    for p in personas:
-        priorities = p.get('keyPriorities', [])
-        if priorities:
-            prompt += f"\n{p.get('name', 'Stakeholder')} cares most about: {', '.join(priorities[:3])}\n"
-
-    prompt += f"""
-SESSION FLOW:
-1. One-sentence acknowledgment of the presentation
-2. Question 1 (first persona)
-3. Wait for answer
-4. Question 2 (second persona)
-5. Wait for answer
-{"6. Question 3 (first persona)" if total_questions >= 3 else ""}
-{"7. Wait for answer" if total_questions >= 3 else ""}
-{"8. Question 4 (second persona)" if total_questions >= 4 else ""}
-{"9. Wait for answer" if total_questions >= 4 else ""}
-THEN: "Thank you for your presentation" + stop_conversation
-
-Total session should be under {qa_duration} minutes. Be concise.
-
-PRESENTATION TRANSCRIPT:
-{transcript_text}
-"""
     return prompt
 
 
@@ -222,12 +171,11 @@ class SessionTimeGuard:
 class WebSocketBidiInput(BidiInput):
     """Bridge browser WebSocket audio into BidiAgent input events."""
 
-    def __init__(self, websocket: WebSocket, time_guard: SessionTimeGuard | None = None, ignore_end: bool = False):
+    def __init__(self, websocket: WebSocket, time_guard: SessionTimeGuard | None = None):
         self._ws = websocket
         self._stopped = False
         self._analytics_requested = asyncio.Event()
         self._time_guard = time_guard
-        self._ignore_end = ignore_end
 
     async def start(self, agent: BidiAgent) -> None:
         self._stopped = False
@@ -269,10 +217,6 @@ class WebSocketBidiInput(BidiInput):
             elif action == "get_analytics":
                 self._analytics_requested.set()
             elif action == "end":
-                if self._ignore_end:
-                    # In multi-persona mode, ignore end signals from client mid-session
-                    print("[WebSocketBidiInput] Ignoring 'end' action (multi-persona mode)", flush=True)
-                    continue
                 self._stopped = True
                 raise asyncio.CancelledError("client ended session")
         raise asyncio.CancelledError("input stopped")
@@ -569,123 +513,6 @@ async def save_qa_analytics(user_id: str, session_id: str, transcript_entries: l
         )
 
 
-# ── Sequential multi-persona handler ─────────────────────────────────
-
-async def run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, primary_persona):
-    """Run sequential BidiAgent sessions — one per persona with their own voice.
-    
-    Each persona gets a strict question limit and its own time allocation.
-    After the limit is hit or time expires, we cleanly stop the agent and
-    move to the next persona.
-    
-    IMPORTANT: Analytics are only sent AFTER all personas complete, to prevent
-    the frontend from sending 'end' and killing subsequent persona sessions.
-    """
-    all_transcript_entries = []
-    client_disconnected = False
-
-    for persona_idx, current_persona in enumerate(all_personas):
-        if client_disconnected:
-            break
-
-        persona_name = current_persona.get('name', 'Stakeholder')
-        persona_voice_id = current_persona.get('voiceId', DEFAULT_VOICE_ID)
-        per_persona_duration = session_duration // len(all_personas)
-
-        # Build prompt with context from previous rounds
-        prev_context = ""
-        if all_transcript_entries:
-            prev_context = "\n\nPREVIOUS Q&A (already asked — do NOT repeat these topics):\n" + "\n".join(
-                f"{'Q' if e['role'] == 'assistant' else 'A'}: {e['text']}" for e in all_transcript_entries[-10:]
-            )
-
-        per_persona_prompt = build_qa_system_prompt(
-            persona_name=persona_name,
-            persona_prompt=current_persona.get('personaPrompt', ''),
-            custom_instructions=current_persona.get('description', '') + prev_context,
-            transcript_text=transcript_text,
-            session_duration=per_persona_duration,
-        )
-
-        # Notify client of persona switch (only for 2nd+ personas)
-        if persona_idx > 0:
-            try:
-                await websocket.send_json({
-                    "type": "persona_switch",
-                    "persona_name": persona_name,
-                    "persona_index": persona_idx,
-                    "total_personas": len(all_personas),
-                })
-                await websocket.send_json({"type": "transcript", "role": "assistant", "text": f"[Switching to {persona_name}...]", "is_partial": False})
-                await asyncio.sleep(2)
-            except (WebSocketDisconnect, Exception):
-                client_disconnected = True
-                break
-
-        print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id}, duration: {per_persona_duration}s)", flush=True)
-
-        model = create_nova_sonic_model(persona_voice_id)
-        time_guard = SessionTimeGuard(per_persona_duration)
-        agent = BidiAgent(
-            model=model,
-            tools=[stop_conversation],
-            system_prompt=per_persona_prompt,
-            hooks=[time_guard],
-        )
-
-        # Fresh input/output per persona
-        # In multi-persona mode, ignore 'end' actions from the client mid-session
-        ws_input = WebSocketBidiInput(websocket, time_guard=time_guard, ignore_end=True)
-        ws_output = WebSocketBidiOutput(websocket)
-
-        try:
-            await asyncio.wait_for(
-                agent.run(inputs=[ws_input], outputs=[ws_output]),
-                timeout=per_persona_duration + 30,  # Hard timeout: persona time + 30s grace
-            )
-        except asyncio.TimeoutError:
-            print(f"[MultiPersona] Hard timeout reached for {persona_name}, forcing switch", flush=True)
-        except WebSocketDisconnect:
-            client_disconnected = True
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            print(f"[MultiPersona] Agent error for {persona_name}: {e}", flush=True)
-        finally:
-            try:
-                await agent.stop()
-            except Exception:
-                pass
-
-        all_transcript_entries.extend(ws_output.transcript_entries)
-        print(f"[MultiPersona] Persona {persona_name} done. Questions asked: {sum(1 for e in ws_output.transcript_entries if e['role'] == 'assistant')}", flush=True)
-
-    # Generate combined analytics
-    if all_transcript_entries and not client_disconnected:
-        try:
-            feedback = await generate_qa_analytics(all_transcript_entries, primary_persona)
-            total_q = sum(1 for e in all_transcript_entries if e['role'] == 'assistant')
-            total_r = sum(1 for e in all_transcript_entries if e['role'] == 'user')
-            await websocket.send_json({
-                "type": "qa_analytics",
-                "qaFeedback": feedback,
-                "totalQuestions": total_q,
-                "totalResponses": total_r,
-            })
-            await save_qa_analytics(user_id, session_id, all_transcript_entries, feedback)
-        except Exception as e:
-            print(f"[MultiPersona] Analytics error: {e}", flush=True)
-
-    try:
-        await websocket.send_json({"type": "session_ended", "reason": "server_complete"})
-    except Exception:
-        pass
-    try:
-        await websocket.close()
-    except Exception:
-        pass
-
-
 # ── App and WebSocket handler ────────────────────────────────────────
 
 app = BedrockAgentCoreApp()
@@ -722,24 +549,18 @@ async def websocket_handler(websocket, context: RequestContext):
         return
 
     persona_id = raw.get("personaId", "")
-    persona_ids = raw.get("personaIds", [])  # Multi-persona support
     user_id = raw.get("userId", "")
     voice_id = raw.get("voiceId", DEFAULT_VOICE_ID)
     session_id = raw.get("sessionId", "") or (context.session_id or "")
+    previous_context = raw.get("previousContext", "")  # Context from prior persona sessions
 
-    # Support both single persona and multi-persona
-    if not persona_ids and persona_id:
-        persona_ids = [persona_id]
-    elif isinstance(persona_ids, str):
-        persona_ids = [p.strip() for p in persona_ids.split(",") if p.strip()]
-
-    print(f"[WebSocket] Setup: user={user_id} personas={persona_ids} session={session_id}", flush=True)
+    print(f"[WebSocket] Setup: user={user_id} persona={persona_id} session={session_id}", flush=True)
 
     _otel_ctx = baggage.set_baggage("session.id", session_id)
     _otel_token = otel_context.attach(_otel_ctx)
 
-    if not persona_ids or not user_id or not session_id:
-        await websocket.send_json({"type": "error", "message": "Missing personaId(s), userId, or sessionId"})
+    if not persona_id or not user_id or not session_id:
+        await websocket.send_json({"type": "error", "message": "Missing personaId, userId, or sessionId"})
         await websocket.close()
         return
 
@@ -749,45 +570,27 @@ async def websocket_handler(websocket, context: RequestContext):
     client_disconnected = False
 
     try:
-        # Load all selected personas
-        all_personas = []
-        for pid in persona_ids:
-            p = await load_persona(pid)
-            if p:
-                all_personas.append(p)
-
-        if not all_personas:
-            await websocket.send_json({"type": "error", "message": "No valid personas found"})
+        # Load persona
+        persona_data = await load_persona(persona_id)
+        if not persona_data:
+            await websocket.send_json({"type": "error", "message": "Persona not found"})
             await websocket.close()
             return
-
-        persona_data = all_personas[0]  # Primary persona for analytics
 
         transcript_text = await load_transcript(user_id, session_id)
         if not transcript_text:
             transcript_text = "No presentation transcript available."
 
-        # Average QA time limits across personas
-        session_duration = int(sum(int(p.get('qaTimeLimitSec', 300)) for p in all_personas) / len(all_personas))
+        session_duration = int(persona_data.get('qaTimeLimitSec', 300))
 
-        # Build combined panel prompt if multiple personas
-        if len(all_personas) == 1:
-            system_prompt = build_qa_system_prompt(
-                persona_name=persona_data.get('name', 'Stakeholder'),
-                persona_prompt=persona_data.get('personaPrompt', ''),
-                custom_instructions=persona_data.get('description', ''),
-                transcript_text=transcript_text,
-                session_duration=session_duration,
-            )
-        else:
-            # MULTI-PERSONA: Sequential BidiAgent sessions with different voices
-            await websocket.send_json({
-                "type": "session_started",
-                "persona_name": persona_data.get('name', 'Stakeholder'),
-                "session_id": session_id,
-            })
-            await run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, persona_data)
-            return  # Sequential handler manages its own cleanup
+        system_prompt = build_qa_system_prompt(
+            persona_name=persona_data.get('name', 'Stakeholder'),
+            persona_prompt=persona_data.get('personaPrompt', ''),
+            custom_instructions=persona_data.get('description', ''),
+            transcript_text=transcript_text,
+            session_duration=session_duration,
+            previous_qa_context=previous_context if previous_context else None,
+        )
 
         # Use persona-specific voice if available, otherwise client-provided or default
         persona_voice = persona_data.get('voiceId', None)
