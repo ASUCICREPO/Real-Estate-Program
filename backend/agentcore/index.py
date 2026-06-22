@@ -566,10 +566,13 @@ async def save_qa_analytics(user_id: str, session_id: str, transcript_entries: l
 # ── Sequential multi-persona handler ─────────────────────────────────
 
 async def run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, primary_persona):
-    """Run sequential BidiAgent sessions — one per persona with their own voice."""
+    """Run sequential BidiAgent sessions — one per persona with their own voice.
+    
+    Key insight: We create a fresh WebSocketBidiInput per persona but reset
+    its stopped flag. The client keeps streaming audio continuously.
+    """
     all_transcript_entries = []
     client_disconnected = False
-    questions_per_persona = 4
 
     for persona_idx, current_persona in enumerate(all_personas):
         if client_disconnected:
@@ -605,7 +608,9 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
         print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id})", flush=True)
 
         if persona_idx > 0:
-            await asyncio.sleep(1.5)
+            # Brief pause — tell client to keep mic open
+            await websocket.send_json({"type": "transcript", "role": "assistant", "text": f"[Switching to {persona_name}...]", "is_partial": False})
+            await asyncio.sleep(2)
 
         model = create_nova_sonic_model(persona_voice_id)
         time_guard = SessionTimeGuard(per_persona_duration)
@@ -616,6 +621,7 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
             hooks=[time_guard],
         )
 
+        # Fresh input/output per persona — input start() triggers the agent
         ws_input = WebSocketBidiInput(websocket, time_guard=time_guard)
         ws_output = WebSocketBidiOutput(websocket)
 
@@ -627,6 +633,9 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
             pass
         except Exception as e:
             print(f"[MultiPersona] Agent error for {persona_name}: {e}", flush=True)
+            # If first persona fails, don't try the rest
+            if persona_idx == 0:
+                break
         finally:
             try:
                 await agent.stop()
