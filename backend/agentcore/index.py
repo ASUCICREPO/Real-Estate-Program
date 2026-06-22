@@ -243,7 +243,8 @@ class WebSocketBidiInput(BidiInput):
         self._time_guard.time_nudge = None
         await self._agent.send(BidiTextInputEvent(text=nudge, role="user"))
         if self._time_guard.force_stop:
-            await asyncio.sleep(15)
+            # Give the agent a brief window to call stop_conversation, then force end
+            await asyncio.sleep(10)
             self._stopped = True
             raise asyncio.CancelledError("session time expired")
 
@@ -568,11 +569,13 @@ async def save_qa_analytics(user_id: str, session_id: str, transcript_entries: l
 async def run_sequential_personas(websocket, all_personas, transcript_text, session_duration, voice_id, user_id, session_id, primary_persona):
     """Run sequential BidiAgent sessions — one per persona with their own voice.
     
-    Key insight: We create a fresh WebSocketBidiInput per persona but reset
-    its stopped flag. The client keeps streaming audio continuously.
+    Each persona gets a strict question limit and its own time allocation.
+    After the limit is hit or time expires, we cleanly stop the agent and
+    move to the next persona.
     """
     all_transcript_entries = []
     client_disconnected = False
+    questions_per_persona = 3  # Hard cap per persona to ensure rotation
 
     for persona_idx, current_persona in enumerate(all_personas):
         if client_disconnected:
@@ -582,35 +585,51 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
         persona_voice_id = current_persona.get('voiceId', DEFAULT_VOICE_ID)
         per_persona_duration = session_duration // len(all_personas)
 
-        # Build prompt with context from previous rounds
+        # Build prompt with context from previous rounds AND a strict question limit
         prev_context = ""
         if all_transcript_entries:
             prev_context = "\n\nPREVIOUS Q&A (already asked — do NOT repeat these topics):\n" + "\n".join(
                 f"{'Q' if e['role'] == 'assistant' else 'A'}: {e['text']}" for e in all_transcript_entries[-10:]
             )
 
+        # Inject strict question limit into custom instructions
+        question_limit_instruction = (
+            f"\n\nSTRICT QUESTION LIMIT: You MUST ask EXACTLY {questions_per_persona} questions, then "
+            f"thank the presenter and use stop_conversation immediately. "
+            f"Do NOT ask follow-up questions. Do NOT exceed {questions_per_persona} questions total. "
+            f"After your {questions_per_persona}th question is answered, say 'Thank you' and call stop_conversation."
+        )
+
         per_persona_prompt = build_qa_system_prompt(
             persona_name=persona_name,
             persona_prompt=current_persona.get('personaPrompt', ''),
-            custom_instructions=current_persona.get('description', '') + prev_context,
+            custom_instructions=current_persona.get('description', '') + prev_context + question_limit_instruction,
             transcript_text=transcript_text,
             session_duration=per_persona_duration,
         )
 
         # Notify client of persona switch
-        await websocket.send_json({
-            "type": "persona_switch",
-            "persona_name": persona_name,
-            "persona_index": persona_idx,
-            "total_personas": len(all_personas),
-        })
+        try:
+            await websocket.send_json({
+                "type": "persona_switch",
+                "persona_name": persona_name,
+                "persona_index": persona_idx,
+                "total_personas": len(all_personas),
+            })
+        except (WebSocketDisconnect, Exception):
+            client_disconnected = True
+            break
 
-        print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id})", flush=True)
+        print(f"[MultiPersona] Starting persona {persona_idx + 1}/{len(all_personas)}: {persona_name} (voice: {persona_voice_id}, limit: {questions_per_persona}q/{per_persona_duration}s)", flush=True)
 
         if persona_idx > 0:
             # Brief pause — tell client to keep mic open
-            await websocket.send_json({"type": "transcript", "role": "assistant", "text": f"[Switching to {persona_name}...]", "is_partial": False})
-            await asyncio.sleep(2)
+            try:
+                await websocket.send_json({"type": "transcript", "role": "assistant", "text": f"[Switching to {persona_name}...]", "is_partial": False})
+                await asyncio.sleep(2)
+            except (WebSocketDisconnect, Exception):
+                client_disconnected = True
+                break
 
         model = create_nova_sonic_model(persona_voice_id)
         time_guard = SessionTimeGuard(per_persona_duration)
@@ -626,16 +645,18 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
         ws_output = WebSocketBidiOutput(websocket)
 
         try:
-            await agent.run(inputs=[ws_input], outputs=[ws_output])
+            await asyncio.wait_for(
+                agent.run(inputs=[ws_input], outputs=[ws_output]),
+                timeout=per_persona_duration + 30,  # Hard timeout: persona time + 30s grace
+            )
+        except asyncio.TimeoutError:
+            print(f"[MultiPersona] Hard timeout reached for {persona_name}, forcing switch", flush=True)
         except WebSocketDisconnect:
             client_disconnected = True
         except asyncio.CancelledError:
             pass
         except Exception as e:
             print(f"[MultiPersona] Agent error for {persona_name}: {e}", flush=True)
-            # If first persona fails, don't try the rest
-            if persona_idx == 0:
-                break
         finally:
             try:
                 await agent.stop()
@@ -643,6 +664,7 @@ async def run_sequential_personas(websocket, all_personas, transcript_text, sess
                 pass
 
         all_transcript_entries.extend(ws_output.transcript_entries)
+        print(f"[MultiPersona] Persona {persona_name} done. Questions asked: {sum(1 for e in ws_output.transcript_entries if e['role'] == 'assistant')}", flush=True)
 
     # Generate combined analytics
     if all_transcript_entries and not client_disconnected:
