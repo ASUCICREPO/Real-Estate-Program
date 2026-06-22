@@ -21,11 +21,14 @@ export interface QATranscriptEntry {
 
 export type QAWebSocketEventType =
   | 'session_started'
+  | 'persona_switch'
   | 'audio'
   | 'transcript'
   | 'interruption'
   | 'qa_analytics'
   | 'session_ended'
+  | 'audio_clear'
+  | 'guardrail_intervention'
   | 'error';
 
 export interface QAWebSocketEvent {
