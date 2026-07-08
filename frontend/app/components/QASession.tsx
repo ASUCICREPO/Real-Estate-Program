@@ -4,11 +4,12 @@ import React, { useMemo, useEffect, useRef, useCallback, useState } from 'react'
 import { ArrowLeft, AlertCircle, MessageSquareText, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useQASession } from '../hooks/useQASession';
 import { QAWebSocketConfig, QATranscriptEntry } from '../services/websocket';
-import { QAAnalyticsResponse, PerPersonaQAAnalytics, MultiPersonaQAResult } from '../services/api';
+import { QAAnalyticsResponse, PerPersonaQAAnalytics, MultiPersonaQAResult, getAnamSessionToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { QA_SESSION_CONFIG, DEFAULT_QA_TIME_LIMIT_SEC, Persona } from '../config/config';
 import QACameraView from './qa/QACameraView';
 import QAOrbPanel from './qa/QAOrbPanel';
+import AnamAvatarPanel from './qa/AnamAvatarPanel';
 
 interface QASessionProps {
   personaId: string;
@@ -42,6 +43,7 @@ interface SinglePersonaSessionProps {
   voiceId?: string;
   qaTimeLimitSec: number;
   previousContext?: string;
+  anamPersonaId?: string;  // Anam avatar persona ID
   onBack: () => void;
   onEnd: (analytics: QAAnalyticsResponse | null, transcript: QATranscriptEntry[]) => void;
   onSkip: () => void;
@@ -57,6 +59,7 @@ function SinglePersonaSession({
   voiceId,
   qaTimeLimitSec,
   previousContext,
+  anamPersonaId,
   onBack,
   onEnd,
   onSkip,
@@ -67,6 +70,15 @@ function SinglePersonaSession({
   const autoNavigatedRef = useRef(false);
   const wasEverActiveRef = useRef(false);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
+  const [anamSessionToken, setAnamSessionToken] = useState<string | null>(null);
+
+  // Fetch Anam session token if persona has an avatar
+  useEffect(() => {
+    if (!anamPersonaId) return;
+    getAnamSessionToken(anamPersonaId)
+      .then(setAnamSessionToken)
+      .catch((err) => console.error('[Anam] Failed to get session token:', err));
+  }, [anamPersonaId]);
 
   const dateStr = useMemo(() => {
     const now = new Date();
@@ -187,19 +199,32 @@ function SinglePersonaSession({
           <QACameraView />
         </div>
 
-        {/* Right: Orb panel with controls */}
+        {/* Right: Avatar or Orb panel with controls */}
         <div className="min-w-0" style={{ flex: '1 1 0%' }}>
-          <QAOrbPanel
-            personaName={displayPersonaName}
-            agentState={qa.agentState}
-            status={qa.status}
-            isMuted={qa.isMuted}
-            botAudioTrack={qa.botAudioTrack}
-            onStart={qa.startSession}
-            onEnd={handleEndSession}
-            onToggleMute={qa.toggleMute}
-            onSkip={onSkip}
-          />
+          {anamPersonaId ? (
+            <AnamAvatarPanel
+              anamPersonaId={anamPersonaId}
+              sessionToken={anamSessionToken}
+              isActive={qa.status === 'active'}
+              isMuted={qa.isMuted}
+              onToggleMute={qa.toggleMute}
+              onEnd={handleEndSession}
+              transcriptText={qa.partialAssistantText}
+              isTranscriptFinal={false}
+            />
+          ) : (
+            <QAOrbPanel
+              personaName={displayPersonaName}
+              agentState={qa.agentState}
+              status={qa.status}
+              isMuted={qa.isMuted}
+              botAudioTrack={qa.botAudioTrack}
+              onStart={qa.startSession}
+              onEnd={handleEndSession}
+              onToggleMute={qa.toggleMute}
+              onSkip={onSkip}
+            />
+          )}
         </div>
       </div>
 
@@ -372,6 +397,14 @@ export default function QASession({
     return voiceId;
   }, [personas, voiceId]);
 
+  // Get Anam persona ID for a given persona index
+  const getAnamPersonaId = useCallback((index: number) => {
+    if (personas && personas[index] && personas[index].anamPersonaId) {
+      return personas[index].anamPersonaId;
+    }
+    return undefined;
+  }, [personas]);
+
   // Build previous context string from accumulated transcripts
   const previousContext = useMemo(() => {
     if (allTranscripts.length === 0) return undefined;
@@ -476,6 +509,7 @@ export default function QASession({
       voiceId={getVoiceId(currentPersonaIndex)}
       qaTimeLimitSec={durationSec}
       previousContext={previousContext}
+      anamPersonaId={getAnamPersonaId(currentPersonaIndex)}
       onBack={onBack}
       onEnd={handlePersonaEnd}
       onSkip={onSkip}

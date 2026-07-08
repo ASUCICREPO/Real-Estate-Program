@@ -70,6 +70,7 @@ export interface Persona {
   timeLimitSec?: number;
   qaTimeLimitSec?: number;
   voiceId?: string;
+  anamPersonaId?: string;
   bestPractices?: PersonaBestPractices;
   scoringWeights?: PersonaScoringWeights;
 }
