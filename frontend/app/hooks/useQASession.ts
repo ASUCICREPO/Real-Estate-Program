@@ -25,10 +25,10 @@ export interface UseQASessionReturn extends QASessionState {
   startSession: () => Promise<void>;
   endSession: () => Promise<QAAnalyticsResponse | null>;
   toggleMute: () => void;
-  /** Register a callback to receive raw base64 PCM audio chunks (for avatar lip sync) */
-  onAudioChunkRef: React.MutableRefObject<((base64: string) => void) | null>;
-  /** Register a callback for when agent finishes a turn */
-  onAgentTurnCompleteRef: React.MutableRefObject<(() => void) | null>;
+  /** Register a callback to receive assistant transcript text (for Anam TTS + lip sync) */
+  onAssistantTextRef: React.MutableRefObject<((text: string, isFinal: boolean) => void) | null>;
+  /** Register a callback to suppress audio playback (when avatar handles voice) */
+  setMuteAudioPlayback: (mute: boolean) => void;
 }
 
 export function useQASession(
@@ -67,8 +67,8 @@ export function useQASession(
   const wasActiveRef = useRef(false);
 
   // Avatar audio passthrough callbacks
-  const onAudioChunkRef = useRef<((base64: string) => void) | null>(null);
-  const onAgentTurnCompleteRef = useRef<(() => void) | null>(null);
+  const onAssistantTextRef = useRef<((text: string, isFinal: boolean) => void) | null>(null);
+  const muteAudioPlaybackRef = useRef(false);
 
   // Audio playback queue
   const playbackContextRef = useRef<AudioContext | null>(null);
@@ -97,10 +97,8 @@ export function useQASession(
 
       case 'audio':
         if (event.data && !endingRef.current) {
-          // Forward raw base64 audio to avatar lip-sync (if callback registered)
-          if (onAudioChunkRef.current) {
-            onAudioChunkRef.current(event.data as string);
-          }
+          // Skip audio playback when avatar handles the voice
+          if (muteAudioPlaybackRef.current) break;
           const pcmBytes = Uint8Array.from(atob(event.data as string), c => c.charCodeAt(0));
           const int16 = new Int16Array(pcmBytes.buffer);
           const float32 = new Float32Array(int16.length);
@@ -119,13 +117,23 @@ export function useQASession(
 
         if (isPartial) {
           if (role === 'user') setPartialUserText(text);
-          else setPartialAssistantText(text);
+          else {
+            setPartialAssistantText(text);
+            // Stream partial assistant text to avatar for TTS + lip sync
+            if (role === 'assistant' && text && onAssistantTextRef.current) {
+              onAssistantTextRef.current(text, false);
+            }
+          }
         } else {
           if (role === 'user') {
             setPartialUserText('');
             if (!isPlayingRef.current) setAgentState('thinking');
           } else {
             setPartialAssistantText('');
+            // Send final text to avatar (end of speech turn)
+            if (role === 'assistant' && text && onAssistantTextRef.current) {
+              onAssistantTextRef.current(text, true);
+            }
           }
           if (text.trim()) {
             setTranscriptEntries(prev => [...prev, { role, text, is_partial: false }]);
@@ -217,10 +225,6 @@ export function useQASession(
       if (!chunk) {
         isPlayingRef.current = false;
         setAgentState('listening');
-        // Signal avatar that agent turn is complete
-        if (onAgentTurnCompleteRef.current) {
-          onAgentTurnCompleteRef.current();
-        }
         return;
       }
       const buffer = ctx.createBuffer(1, chunk.length, QA_SESSION_CONFIG.AUDIO_SAMPLE_RATE);
@@ -459,7 +463,7 @@ export function useQASession(
     startSession,
     endSession,
     toggleMute,
-    onAudioChunkRef,
-    onAgentTurnCompleteRef,
+    onAssistantTextRef,
+    setMuteAudioPlayback: (mute: boolean) => { muteAudioPlaybackRef.current = mute; },
   };
 }

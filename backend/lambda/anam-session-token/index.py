@@ -54,11 +54,10 @@ def lambda_handler(event, context):
     if not anam_persona_id:
         return response(400, {'error': 'Missing anamPersonaId'}, headers)
 
-    # Request session token from Anam API (with audio passthrough for Nova Sonic lip sync)
+    # Request session token from Anam API
     payload = json.dumps({
         'personaConfig': {
             'personaId': anam_persona_id,
-            'enableAudioPassthrough': True,
         },
     }).encode('utf-8')
 

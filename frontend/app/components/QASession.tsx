@@ -103,6 +103,15 @@ function SinglePersonaSession({
   const { endSession } = qa;
   const displayPersonaName = qa.personaName || initialPersonaName;
 
+  // Mute Nova Sonic audio playback when avatar is handling the voice
+  useEffect(() => {
+    if (anamPersonaId) {
+      qa.setMuteAudioPlayback(true);
+    }
+    return () => { qa.setMuteAudioPlayback(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anamPersonaId]);
+
   const remaining = Math.max(0, qaTimeLimitSec - qa.timer);
   const isWarning = remaining <= QA_SESSION_CONFIG.WARNING_AT_SEC;
   const isCritical = remaining <= QA_SESSION_CONFIG.FINAL_WARNING_AT_SEC;
@@ -216,8 +225,7 @@ function SinglePersonaSession({
               isMuted={qa.isMuted}
               onToggleMute={qa.toggleMute}
               onEnd={handleEndSession}
-              onAudioChunkRef={qa.onAudioChunkRef}
-              onAgentTurnCompleteRef={qa.onAgentTurnCompleteRef}
+              onAssistantTextRef={qa.onAssistantTextRef}
             />
           ) : (
             <QAOrbPanel
