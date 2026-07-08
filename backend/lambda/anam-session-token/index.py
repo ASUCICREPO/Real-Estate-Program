@@ -56,9 +56,8 @@ def lambda_handler(event, context):
 
     # Request session token from Anam API
     payload = json.dumps({
-        'personaId': anam_persona_id,
         'personaConfig': {
-            'llmId': 'CUSTOMER_CLIENT_V1',  # Disable Anam's LLM — we control text via talk()
+            'personaId': anam_persona_id,
         },
     }).encode('utf-8')
 
