@@ -119,6 +119,13 @@ function SinglePersonaSession({
     if (qa.status === 'active') wasEverActiveRef.current = true;
   }, [qa.status]);
 
+  // Auto-start the Nova Sonic QA session when avatar is being used
+  useEffect(() => {
+    if (anamPersonaId && qa.status === 'idle') {
+      qa.startSession();
+    }
+  }, [anamPersonaId, qa.status, qa.startSession]);
+
   useEffect(() => {
     if (qa.status === 'ended' && !autoNavigatedRef.current) {
       autoNavigatedRef.current = true;
