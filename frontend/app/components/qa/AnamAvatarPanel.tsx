@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createClient, AnamEvent } from '@anam-ai/js-sdk';
-import { Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
 
 interface AnamAvatarPanelProps {
     anamPersonaId: string;
@@ -11,10 +11,10 @@ interface AnamAvatarPanelProps {
     isMuted: boolean;
     onToggleMute: () => void;
     onEnd: () => void;
-    /** Called when a new assistant transcript chunk arrives from our WebSocket */
-    transcriptText?: string;
-    /** Whether this is a partial or final transcript */
-    isTranscriptFinal?: boolean;
+    /** Ref to register audio chunk callback (Nova Sonic PCM base64 -> avatar lip sync) */
+    onAudioChunkRef: React.MutableRefObject<((base64: string) => void) | null>;
+    /** Ref to register agent turn complete callback */
+    onAgentTurnCompleteRef: React.MutableRefObject<(() => void) | null>;
 }
 
 export default function AnamAvatarPanel({
@@ -24,15 +24,15 @@ export default function AnamAvatarPanel({
     isMuted,
     onToggleMute,
     onEnd,
-    transcriptText,
-    isTranscriptFinal,
+    onAudioChunkRef,
+    onAgentTurnCompleteRef,
 }: AnamAvatarPanelProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
-    const talkStreamRef = useRef<ReturnType<ReturnType<typeof createClient>['createTalkMessageStream']> | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const audioInputRef = useRef<any>(null);
     const [connected, setConnected] = useState(false);
     const [connecting, setConnecting] = useState(false);
-    const lastTextRef = useRef('');
 
     // Initialize Anam client when session token is available
     useEffect(() => {
@@ -42,18 +42,32 @@ export default function AnamAvatarPanel({
             setConnecting(true);
             try {
                 const client = createClient(sessionToken, {
-                    disableInputAudio: true, // We handle mic ourselves via Nova Sonic
+                    disableInputAudio: true, // We handle mic via Nova Sonic, not Anam
                 });
 
                 client.addListener(AnamEvent.CONNECTION_ESTABLISHED, () => {
-                    console.log('[Anam] Connected');
+                    console.log('[Anam] Connected — creating audio passthrough stream');
                     setConnected(true);
                     setConnecting(false);
+
+                    // Create audio input stream for lip-sync passthrough
+                    try {
+                        const audioInput = client.createAgentAudioInputStream({
+                            encoding: 'pcm_s16le',
+                            sampleRate: 16000,
+                            channels: 1,
+                        });
+                        audioInputRef.current = audioInput;
+                        console.log('[Anam] Audio passthrough stream ready');
+                    } catch (e) {
+                        console.error('[Anam] Failed to create audio input stream:', e);
+                    }
                 });
 
                 client.addListener(AnamEvent.CONNECTION_CLOSED, () => {
                     console.log('[Anam] Connection closed');
                     setConnected(false);
+                    audioInputRef.current = null;
                 });
 
                 clientRef.current = client;
@@ -77,40 +91,43 @@ export default function AnamAvatarPanel({
                     // Ignore cleanup errors
                 }
                 clientRef.current = null;
+                audioInputRef.current = null;
                 setConnected(false);
             }
         };
     }, [sessionToken, isActive]);
 
-    // Stream assistant transcript text to Anam for lip sync + TTS
+    // Register audio chunk callback — forwards Nova Sonic PCM to Anam for lip sync
     useEffect(() => {
-        if (!connected || !clientRef.current || !transcriptText) return;
-        if (transcriptText === lastTextRef.current) return;
-
-        const newText = transcriptText.slice(lastTextRef.current.length);
-        lastTextRef.current = transcriptText;
-
-        if (!newText) return;
-
-        // If no active stream or the stream ended, create a new one
-        if (!talkStreamRef.current || !talkStreamRef.current.isActive()) {
-            talkStreamRef.current = clientRef.current.createTalkMessageStream();
-        }
-
-        try {
-            if (talkStreamRef.current.isActive()) {
-                talkStreamRef.current.streamMessageChunk(newText, !!isTranscriptFinal);
+        onAudioChunkRef.current = (base64: string) => {
+            if (audioInputRef.current) {
+                try {
+                    audioInputRef.current.sendAudioChunk(base64);
+                } catch (e) {
+                    // Ignore send errors
+                }
             }
-        } catch (e) {
-            console.warn('[Anam] Failed to stream chunk:', e);
-        }
+        };
+        return () => {
+            onAudioChunkRef.current = null;
+        };
+    }, [onAudioChunkRef, connected]);
 
-        // If final, reset for next turn
-        if (isTranscriptFinal) {
-            lastTextRef.current = '';
-            talkStreamRef.current = null;
-        }
-    }, [transcriptText, isTranscriptFinal, connected]);
+    // Register agent turn complete callback
+    useEffect(() => {
+        onAgentTurnCompleteRef.current = () => {
+            if (audioInputRef.current) {
+                try {
+                    audioInputRef.current.endSequence();
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        };
+        return () => {
+            onAgentTurnCompleteRef.current = null;
+        };
+    }, [onAgentTurnCompleteRef, connected]);
 
     const handleEnd = useCallback(() => {
         if (clientRef.current) {
@@ -120,6 +137,7 @@ export default function AnamAvatarPanel({
                 // Ignore
             }
             clientRef.current = null;
+            audioInputRef.current = null;
         }
         setConnected(false);
         onEnd();
@@ -166,10 +184,9 @@ export default function AnamAvatarPanel({
 
                 <button
                     onClick={handleEnd}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
-                    title="End Session"
+                    className="flex items-center gap-2 rounded-full bg-red-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-600 transition-colors font-sans shadow-sm"
                 >
-                    <PhoneOff className="h-5 w-5" />
+                    End Session
                 </button>
             </div>
         </div>

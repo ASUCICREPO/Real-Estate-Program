@@ -25,6 +25,10 @@ export interface UseQASessionReturn extends QASessionState {
   startSession: () => Promise<void>;
   endSession: () => Promise<QAAnalyticsResponse | null>;
   toggleMute: () => void;
+  /** Register a callback to receive raw base64 PCM audio chunks (for avatar lip sync) */
+  onAudioChunkRef: React.MutableRefObject<((base64: string) => void) | null>;
+  /** Register a callback for when agent finishes a turn */
+  onAgentTurnCompleteRef: React.MutableRefObject<(() => void) | null>;
 }
 
 export function useQASession(
@@ -62,6 +66,10 @@ export function useQASession(
   const endingRef = useRef(false);
   const wasActiveRef = useRef(false);
 
+  // Avatar audio passthrough callbacks
+  const onAudioChunkRef = useRef<((base64: string) => void) | null>(null);
+  const onAgentTurnCompleteRef = useRef<(() => void) | null>(null);
+
   // Audio playback queue
   const playbackContextRef = useRef<AudioContext | null>(null);
   const playbackDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
@@ -89,6 +97,10 @@ export function useQASession(
 
       case 'audio':
         if (event.data && !endingRef.current) {
+          // Forward raw base64 audio to avatar lip-sync (if callback registered)
+          if (onAudioChunkRef.current) {
+            onAudioChunkRef.current(event.data as string);
+          }
           const pcmBytes = Uint8Array.from(atob(event.data as string), c => c.charCodeAt(0));
           const int16 = new Int16Array(pcmBytes.buffer);
           const float32 = new Float32Array(int16.length);
@@ -205,6 +217,10 @@ export function useQASession(
       if (!chunk) {
         isPlayingRef.current = false;
         setAgentState('listening');
+        // Signal avatar that agent turn is complete
+        if (onAgentTurnCompleteRef.current) {
+          onAgentTurnCompleteRef.current();
+        }
         return;
       }
       const buffer = ctx.createBuffer(1, chunk.length, QA_SESSION_CONFIG.AUDIO_SAMPLE_RATE);
@@ -443,5 +459,7 @@ export function useQASession(
     startSession,
     endSession,
     toggleMute,
+    onAudioChunkRef,
+    onAgentTurnCompleteRef,
   };
 }

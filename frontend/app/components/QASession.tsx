@@ -216,8 +216,8 @@ function SinglePersonaSession({
               isMuted={qa.isMuted}
               onToggleMute={qa.toggleMute}
               onEnd={handleEndSession}
-              transcriptText={qa.partialAssistantText}
-              isTranscriptFinal={false}
+              onAudioChunkRef={qa.onAudioChunkRef}
+              onAgentTurnCompleteRef={qa.onAgentTurnCompleteRef}
             />
           ) : (
             <QAOrbPanel
