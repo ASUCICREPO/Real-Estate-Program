@@ -495,6 +495,34 @@ export class RealEstateProgramStack extends cdk.Stack {
     });
 
     // ──────────────────────────────────────────────
+    // Lambda: Anam AI Session Token
+    // ──────────────────────────────────────────────
+    const anamSessionTokenLambda = new lambda.Function(this, 'AnamSessionTokenLambda', {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: 'index.lambda_handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda', 'anam-session-token')),
+      timeout: cdk.Duration.seconds(15),
+      role: new iam.Role(this, 'AnamSessionTokenLambdaRole', {
+        assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        ],
+      }),
+      environment: {
+        'ANAM_API_KEY': process.env.ANAM_API_KEY || '',
+        'ALLOWED_ORIGINS': cdk.Fn.join(',', allowedOrigins),
+      },
+    });
+
+    // /anam-session
+    const anamResource = api.root.addResource('anam-session');
+    anamResource.addMethod('POST', new apigateway.LambdaIntegration(anamSessionTokenLambda), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+    anamResource.addMethod('OPTIONS', new apigateway.LambdaIntegration(anamSessionTokenLambda));
+
+    // ──────────────────────────────────────────────
     // Expose values for cross-stack references
     // ──────────────────────────────────────────────
     this.userPoolId = userPool.userPoolId;

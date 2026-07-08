@@ -610,3 +610,23 @@ export async function getReportPdfUrl(sessionId: string): Promise<string | null>
     return data.url || null;
   } catch { return null; }
 }
+
+
+// ─── Anam AI ─────────────────────────────────────────────────────────
+
+export async function getAnamSessionToken(anamPersonaId: string): Promise<string> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/anam-session`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ anamPersonaId }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to get Anam session token: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.sessionToken;
+}

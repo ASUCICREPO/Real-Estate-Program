@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anam-ai/js-sdk": "^4.20.0",
     "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-transcribe-streaming": "^3.985.0",
     "@aws-sdk/credential-providers": "^3.994.0",
