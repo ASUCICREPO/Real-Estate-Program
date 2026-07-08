@@ -520,7 +520,6 @@ export class RealEstateProgramStack extends cdk.Stack {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO,
     });
-    anamResource.addMethod('OPTIONS', new apigateway.LambdaIntegration(anamSessionTokenLambda));
 
     // ──────────────────────────────────────────────
     // Expose values for cross-stack references
