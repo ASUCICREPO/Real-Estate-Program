@@ -362,7 +362,7 @@ export default function Home() {
             personaIds={additionalPersonas.length > 0 ? [selectedPersona || '', ...additionalPersonas.map(p => p.personaID)] : undefined}
             personaName={selectedPersonaName}
             personaNames={additionalPersonas.length > 0 ? [selectedPersonaName, ...additionalPersonas.map(p => p.name)] : undefined}
-            personas={additionalPersonas.length > 0 ? [selectedPersonaData as Persona, ...additionalPersonas] : undefined}
+            personas={selectedPersonaData ? [selectedPersonaData as Persona, ...additionalPersonas] : undefined}
             sessionId={sessionId}
             userId={userId || ''}
             qaTimeLimitSec={selectedPersonaQATimeLimit}

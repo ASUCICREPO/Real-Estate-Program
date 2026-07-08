@@ -423,6 +423,8 @@ export default function QASession({
 
   // ── Single-persona mode ──
   if (!isMultiPersona) {
+    // Get anamPersonaId from personas array (if provided) or undefined
+    const singleAnamId = personas?.[0]?.anamPersonaId;
     return (
       <SinglePersonaSession
         personaId={personaId}
@@ -431,6 +433,7 @@ export default function QASession({
         userId={userId}
         voiceId={voiceId}
         qaTimeLimitSec={durationSec}
+        anamPersonaId={singleAnamId}
         onBack={onBack}
         onEnd={(analytics) => {
           onComplete(Promise.resolve(analytics));
