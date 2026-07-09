@@ -119,10 +119,6 @@ export function useQASession(
           if (role === 'user') setPartialUserText(text);
           else {
             setPartialAssistantText(text);
-            // Stream partial assistant text to avatar for TTS + lip sync
-            if (role === 'assistant' && text && onAssistantTextRef.current) {
-              onAssistantTextRef.current(text, false);
-            }
           }
         } else {
           if (role === 'user') {
@@ -130,8 +126,8 @@ export function useQASession(
             if (!isPlayingRef.current) setAgentState('thinking');
           } else {
             setPartialAssistantText('');
-            // Send final text to avatar (end of speech turn)
-            if (role === 'assistant' && text && onAssistantTextRef.current) {
+            // Send final assistant text to avatar for TTS + lip sync
+            if (text && onAssistantTextRef.current) {
               onAssistantTextRef.current(text, true);
             }
           }
