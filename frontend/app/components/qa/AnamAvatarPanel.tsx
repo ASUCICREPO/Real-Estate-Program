@@ -127,7 +127,7 @@ export default function AnamAvatarPanel({
     return (
         <div className="flex flex-col items-center gap-4">
             {/* Avatar Video */}
-            <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black shadow-lg">
+            <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-900 shadow-lg">
                 <video
                     id={`anam-video-${anamPersonaId}`}
                     ref={videoRef}
@@ -135,17 +135,16 @@ export default function AnamAvatarPanel({
                     playsInline
                     className="w-full h-full object-cover"
                 />
-                {connecting && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                        <div className="flex items-center gap-2 text-white">
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            <span className="text-sm font-sans">Connecting avatar...</span>
+                {/* Loading overlay — shown when avatar isn't connected yet */}
+                {!connected && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900">
+                        <div className="relative mb-4">
+                            <div className="h-16 w-16 rounded-full border-4 border-gray-700 border-t-maroon animate-spin" />
                         </div>
-                    </div>
-                )}
-                {!sessionToken && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                        <span className="text-sm text-gray-400 font-sans">Preparing avatar...</span>
+                        <p className="text-sm font-medium text-gray-300 font-sans">
+                            {!sessionToken ? 'Preparing session...' : connecting ? 'Connecting avatar...' : 'Initializing...'}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500 font-sans">This may take a few seconds</p>
                     </div>
                 )}
             </div>
@@ -155,8 +154,8 @@ export default function AnamAvatarPanel({
                 <button
                     onClick={onToggleMute}
                     className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${isMuted
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                     title={isMuted ? 'Unmute' : 'Mute'}
                 >
