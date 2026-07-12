@@ -594,8 +594,14 @@ async def websocket_handler(websocket, context: RequestContext):
         )
 
         # Use persona-specific voice if available, otherwise client-provided or default
-        persona_voice = persona_data.get('voiceId', None)
-        effective_voice = persona_voice or voice_id
+        # If persona uses Anam avatar for voice, force English voice for Nova Sonic STT
+        has_anam_avatar = bool(persona_data.get('anamPersonaId', ''))
+        if has_anam_avatar:
+            # Anam handles TTS — Nova Sonic only does STT, so use English voice
+            effective_voice = "matthew"
+        else:
+            persona_voice = persona_data.get('voiceId', None)
+            effective_voice = persona_voice or voice_id
         model = create_nova_sonic_model(effective_voice)
         time_guard = SessionTimeGuard(session_duration)
         agent = BidiAgent(
