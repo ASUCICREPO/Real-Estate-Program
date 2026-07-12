@@ -186,13 +186,16 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
 
   const stats = (() => {
     if (windows.length === 0) return null;
-    const avgWpm = Math.round(windows.reduce((s, w) => s + w.speakingPace.average, 0) / windows.length);
-    const avgVolume = Math.round(windows.reduce((s, w) => s + w.volumeLevel.average, 0) / windows.length);
-    const avgEyeContact = Math.round(windows.reduce((s, w) => s + w.eyeContactScore, 0) / windows.length);
-    const totalFillers = windows.reduce((s, w) => s + w.fillerWords, 0);
-    const avgFillersPerWindow = windows.length > 0 ? Math.ceil(totalFillers / windows.length) : 0;
-    const totalPauses = windows.reduce((s, w) => s + w.pauses, 0);
-    const avgPausesPerWindow = windows.length > 0 ? Math.ceil(totalPauses / windows.length) : 0;
+    // Safety check: ensure windows have required metrics (may be missing in QA-only sessions)
+    const validWindows = windows.filter(w => w.speakingPace && w.volumeLevel);
+    if (validWindows.length === 0) return null;
+    const avgWpm = Math.round(validWindows.reduce((s, w) => s + w.speakingPace.average, 0) / validWindows.length);
+    const avgVolume = Math.round(validWindows.reduce((s, w) => s + w.volumeLevel.average, 0) / validWindows.length);
+    const avgEyeContact = Math.round(validWindows.reduce((s, w) => s + (w.eyeContactScore ?? 0), 0) / validWindows.length);
+    const totalFillers = validWindows.reduce((s, w) => s + (w.fillerWords ?? 0), 0);
+    const avgFillersPerWindow = validWindows.length > 0 ? Math.ceil(totalFillers / validWindows.length) : 0;
+    const totalPauses = validWindows.reduce((s, w) => s + (w.pauses ?? 0), 0);
+    const avgPausesPerWindow = validWindows.length > 0 ? Math.ceil(totalPauses / validWindows.length) : 0;
     return { avgWpm, avgVolume, avgEyeContact, totalFillers, avgFillersPerWindow, totalPauses, avgPausesPerWindow };
   })();
 
