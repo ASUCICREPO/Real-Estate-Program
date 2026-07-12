@@ -655,7 +655,7 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
         )}
 
         {/* Key Recommendations */}
-        {aiFeedback && aiFeedback.keyRecommendations.length > 0 && (
+        {aiFeedback && Array.isArray(aiFeedback.keyRecommendations) && aiFeedback.keyRecommendations.length > 0 && (
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-5 text-lg font-semibold text-gray-900">
               Key Recommendations{feedbackPersona ? ` for ${feedbackPersona.title}` : ''} <InfoTooltip text="AI-generated suggestions tailored to your selected audience persona to help improve your next presentation." />
@@ -685,7 +685,7 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
       </div>
 
       {/* Content Strengths */}
-      {aiFeedback && aiFeedback.performanceSummary.contentStrengths.length > 0 && (
+      {aiFeedback && aiFeedback.performanceSummary?.contentStrengths && aiFeedback.performanceSummary.contentStrengths.length > 0 && (
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Content Strengths <InfoTooltip text="Aspects of your presentation content that the AI identified as effective — structure, clarity, and argument quality." /></h2>
           <ul className="space-y-3">
