@@ -215,7 +215,7 @@ export default function PersonaCard({
               {expertise}
             </span>
           </div>
-          <p className="mt-1 text-sm leading-snug text-gray-500 font-sans line-clamp-1 2xl:text-base">{description}</p>
+          <p className={`mt-1 text-sm leading-snug text-gray-500 font-sans 2xl:text-base ${isSelected ? '' : 'line-clamp-1'}`}>{description}</p>
         </div>
 
         {/* Right side: time + action */}
