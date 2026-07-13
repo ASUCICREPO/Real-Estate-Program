@@ -237,10 +237,10 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
     if (type === 'wpm') {
       const wpmOuter = bp.wpm.max - bp.wpm.min;
       return BEST_PRACTICES.wpm.check(score) ? 'text-green-600'
-        : score >= bp.wpm.min - wpmOuter && score <= bp.wpm.max + wpmOuter ? 'text-yellow-600' : 'text-red-600';
+        : score >= bp.wpm.min - wpmOuter && score <= bp.wpm.max + wpmOuter ? 'text-red-500' : 'text-red-600';
     }
-    if (type === 'volume') return score >= 40 && score <= 80 ? 'text-green-600' : score >= 20 ? 'text-yellow-600' : 'text-red-600';
-    return score >= bp.eyeContact.min ? 'text-green-600' : score >= bp.eyeContact.min - 20 ? 'text-yellow-600' : 'text-red-600';
+    if (type === 'volume') return score >= 40 && score <= 80 ? 'text-green-600' : score >= 20 ? 'text-red-500' : 'text-red-600';
+    return score >= bp.eyeContact.min ? 'text-green-600' : score >= bp.eyeContact.min - 20 ? 'text-red-500' : 'text-red-600';
   };
 
   const feedbackPersona = aiFeedback?.persona;
@@ -541,15 +541,15 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
                   let Icon = AlertTriangle;
 
                   if (isFiller) {
-                    borderColor = 'border-yellow-200'; bgColor = 'bg-yellow-50'; iconColor = 'text-yellow-500'; Icon = MessageCircle;
+                    borderColor = 'border-red-200'; bgColor = 'bg-red-50'; iconColor = 'text-red-500'; Icon = MessageCircle;
                   } else if (isPace) {
-                    borderColor = 'border-yellow-200'; bgColor = 'bg-yellow-50'; iconColor = 'text-yellow-500'; Icon = Gauge;
+                    borderColor = 'border-red-200'; bgColor = 'bg-red-50'; iconColor = 'text-red-500'; Icon = Gauge;
                   } else if (isEye) {
                     borderColor = 'border-red-200'; bgColor = 'bg-red-50'; iconColor = 'text-red-500'; Icon = Eye;
                   } else if (isPause) {
-                    borderColor = 'border-yellow-200'; bgColor = 'bg-yellow-50'; iconColor = 'text-yellow-500'; Icon = Clock;
+                    borderColor = 'border-red-200'; bgColor = 'bg-red-50'; iconColor = 'text-red-500'; Icon = Clock;
                   } else if (isVolume) {
-                    borderColor = 'border-yellow-200'; bgColor = 'bg-yellow-50'; iconColor = 'text-yellow-500'; Icon = Volume2;
+                    borderColor = 'border-red-200'; bgColor = 'bg-red-50'; iconColor = 'text-red-500'; Icon = Volume2;
                   }
 
                   return (
@@ -631,7 +631,7 @@ export default function ReviewAnalytics({ sessionData, aiFeedback, qaAnalytics, 
               <div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1.5 font-medium text-gray-700"><MessageCircle className="h-4 w-4 text-orange-500" />Filler Words</span>
-                  <span className={`font-bold ${stats.avgFillersPerWindow <= bp.fillerWords.max ? 'text-green-600' : stats.avgFillersPerWindow <= bp.fillerWords.max * 2 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  <span className={`font-bold ${stats.avgFillersPerWindow <= bp.fillerWords.max ? 'text-green-600' : 'text-red-600'}`}>
                     {stats.avgFillersPerWindow}/window (avg)
                   </span>
                 </div>
