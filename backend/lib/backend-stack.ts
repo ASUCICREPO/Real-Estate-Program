@@ -329,10 +329,11 @@ export class RealEstateProgramStack extends cdk.Stack {
 
     contentAnalysisLambda.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      actions: ['bedrock:InvokeModel'],
+      actions: ['bedrock:InvokeModel', 'bedrock:ApplyGuardrail'],
       resources: [
         'arn:aws:bedrock:*::foundation-model/*',
         `arn:aws:bedrock:*:${this.account}:inference-profile/*`,
+        `arn:aws:bedrock:*:${this.account}:guardrail/*`,
       ],
     }));
 
@@ -381,6 +382,9 @@ export class RealEstateProgramStack extends cdk.Stack {
       actions: ['bedrock:ApplyGuardrail'],
       resources: [guardrail.attrGuardrailArn],
     }));
+
+    contentAnalysisLambda.addEnvironment('BEDROCK_GUARDRAIL_ID', guardrail.attrGuardrailId);
+    contentAnalysisLambda.addEnvironment('BEDROCK_GUARDRAIL_VERSION', guardrailVersion.attrVersion);
 
     // ──────────────────────────────────────────────
     // API Gateway

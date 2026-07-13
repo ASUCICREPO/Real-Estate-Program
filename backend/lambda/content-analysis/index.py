@@ -22,6 +22,8 @@ UPLOADS_BUCKET = os.environ.get('UPLOADS_BUCKET', '')
 PERSONA_TABLE_NAME = os.environ.get('PERSONA_TABLE_NAME', '')
 ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 MODEL_ID = os.environ.get('CONTENT_MODEL_ID', 'us.anthropic.claude-3-5-haiku-20241022-v1:0')
+GUARDRAIL_ID = os.environ.get('BEDROCK_GUARDRAIL_ID', '')
+GUARDRAIL_VERSION = os.environ.get('BEDROCK_GUARDRAIL_VERSION', '3')
 
 persona_table = dynamodb.Table(PERSONA_TABLE_NAME)
 
@@ -63,6 +65,15 @@ def lambda_handler(event, context):
         if not document_content:
             return response(404, {'error': 'Document not found in S3'}, headers)
 
+        # Check content relevance to real estate using Bedrock guardrails
+        relevance_check = check_content_relevance(document_content)
+        if not relevance_check['relevant']:
+            return response(400, {
+                'error': 'Content not related to real estate',
+                'message': relevance_check.get('reason', 'The uploaded content does not appear to be related to real estate development. Please upload a real estate presentation or proposal.'),
+                'rejected': True,
+            }, headers)
+
         # Generate questions using Bedrock
         questions = generate_questions(persona, document_content)
 
@@ -85,6 +96,65 @@ def get_persona(persona_id):
     except ClientError as e:
         logger.error(f'DynamoDB error: {e}')
         return None
+
+
+def check_content_relevance(document_content):
+    """Check if uploaded content is related to real estate using Bedrock guardrails."""
+    # Extract a sample of text for relevance checking
+    if document_content['type'] == 'text':
+        sample = document_content['data'][:5000]
+    else:
+        # For PDFs, we can't easily extract text without processing — do a quick LLM check
+        sample = None
+
+    if not sample:
+        # Skip relevance check for PDFs (will be caught by question generation if irrelevant)
+        return {'relevant': True}
+
+    # Use the guardrail to check content if available
+    if GUARDRAIL_ID:
+        try:
+            result = bedrock_client.apply_guardrail(
+                guardrailIdentifier=GUARDRAIL_ID,
+                guardrailVersion=GUARDRAIL_VERSION,
+                source='INPUT',
+                content=[{'text': {'text': f"Real estate content check: {sample[:3000]}"}}],
+            )
+            if result.get('action') == 'GUARDRAIL_INTERVENED':
+                return {'relevant': False, 'reason': 'Content was flagged by content safety guardrails.'}
+        except Exception as e:
+            logger.warning(f'Guardrail check failed (proceeding): {e}')
+
+    # Quick LLM-based relevance check
+    try:
+        check_prompt = f"""Determine if the following text is related to real estate (property development, investment, construction, zoning, market analysis, financial projections, etc.).
+
+Text sample:
+{sample[:3000]}
+
+Respond with ONLY "RELEVANT" or "NOT_RELEVANT" followed by a brief reason."""
+
+        check_response = bedrock_client.invoke_model(
+            modelId=MODEL_ID,
+            contentType='application/json',
+            accept='application/json',
+            body=json.dumps({
+                'anthropic_version': 'bedrock-2023-05-31',
+                'max_tokens': 100,
+                'messages': [{'role': 'user', 'content': check_prompt}],
+            }),
+        )
+        check_body = json.loads(check_response['body'].read())
+        check_text = check_body.get('content', [{}])[0].get('text', '').strip()
+
+        if check_text.startswith('NOT_RELEVANT'):
+            reason = check_text.replace('NOT_RELEVANT', '').strip(' :-')
+            return {'relevant': False, 'reason': reason or 'Content does not appear to be related to real estate.'}
+
+    except Exception as e:
+        logger.warning(f'Relevance check failed (proceeding): {e}')
+
+    return {'relevant': True}
 
 
 def read_document(s3_key):
