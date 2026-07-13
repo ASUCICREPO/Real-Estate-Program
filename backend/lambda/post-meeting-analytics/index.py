@@ -164,6 +164,9 @@ def generate_timestamped_feedback(session_analytics, persona=None, override=None
     events = []
 
     for w in windows:
+        # Skip low-activity windows where user wasn't actively speaking
+        if w.get('speakingPace', {}).get('average', 0) <= 20:
+            continue
         ts = _window_timestamp(w.get('windowNumber', 1))
         pace = w.get('speakingPace', {}).get('average', 0)
         eye = w.get('eyeContactScore', 100)
@@ -250,6 +253,8 @@ def generate_feedback(persona, transcript, persona_customization=None,
     if session_analytics:
         final_avg = session_analytics.get('finalAverage', {})
         windows = session_analytics.get('windows', [])
+        # Filter out low-activity windows (where user barely spoke — e.g., during agent's turn)
+        active_windows = [w for w in windows if w.get('speakingPace', {}).get('average', 0) > 20]
         parts.extend([
             "",
             "Session Delivery Metrics (captured in 30-second windows):",
@@ -258,12 +263,12 @@ def generate_feedback(persona, transcript, persona_customization=None,
             f"- Overall Eye Contact Score: {final_avg.get('eyeContactScore', 'N/A')}%",
             f"- Total Filler Words: {final_avg.get('totalFillerWords', 'N/A')}",
             f"- Total Pauses: {final_avg.get('totalPauses', 'N/A')}",
-            f"- Number of 30-second Windows: {final_avg.get('totalWindows', len(windows))}",
+            f"- Number of Active Windows: {len(active_windows)} (out of {len(windows)} total)",
         ])
-        if windows:
+        if active_windows:
             parts.append("")
-            parts.append("Per-Window Breakdown:")
-            for w in windows:
+            parts.append("Per-Window Breakdown (only windows where presenter was actively speaking):")
+            for w in active_windows:
                 pace = w.get('speakingPace', {})
                 volume = w.get('volumeLevel', {})
                 parts.append(
