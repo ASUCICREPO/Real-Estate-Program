@@ -152,9 +152,9 @@ export default function TutorialModal({ isOpen, onClose, userName }: TutorialMod
                             </div>
                             {/* Numbered steps */}
                             <div className="space-y-4">
-                                <NumberedItem n={1} title="Browse Available Personas" desc="We offer 7 different personas including Academic Expert, Industry Partners, Investors & VCs, Undergraduate Students, Graduate Students, Public Stakeholders, and Conference Attendees." />
-                                <NumberedItem n={2} title="Expand to See Details" desc="Click on a persona to view their key priorities, optimal presentation time, and communication style." />
-                                <NumberedItem n={3} title="Customize (Optional)" desc="Adjust presentation time, talk format, or add custom notes to tailor feedback to your specific context." />
+                                <NumberedItem n={1} title="Browse Available Personas" desc="Choose from stakeholder personas including Real Estate Investors, Public Officials, Negotiation Counterparty, and Commercial Lender — each with a unique AI avatar and voice." />
+                                <NumberedItem n={2} title="Expand to See Details" desc="Click on a persona to view their full description, key priorities, communication style, and optimal presentation time." />
+                                <NumberedItem n={3} title="Customize (Optional)" desc="Adjust Q&A session duration (1-15 min), speaking baselines, or add custom notes. You can also select multiple personas for a panel-style Q&A." />
                             </div>
                         </div>
                     )}
@@ -245,7 +245,7 @@ export default function TutorialModal({ isOpen, onClose, userName }: TutorialMod
                             </div>
                             <div className="space-y-3">
                                 <FeatureItem icon={<BarChart3 size={16} className="text-blue-500" />} title="Comprehensive Analytics Dashboard" desc="View detailed metrics, timestamped feedback events, and performance trends across all areas." />
-                                <FeatureItem icon={<MessageCircle size={16} className="text-teal-500" />} title="Persona-Specific Q&A Practice" desc="Practice answering challenging questions tailored to your selected audience persona. Questions will match the priorities and expertise level of your audience." />
+                                <FeatureItem icon={<MessageCircle size={16} className="text-teal-500" />} title="Multi-Persona Q&A with AI Avatars" desc="Practice answering live questions from AI stakeholders with realistic avatars and voices. Select multiple personas for a panel-style Q&A — each takes turns grilling you." />
                                 <FeatureItem icon={<CheckCircle2 size={16} className="text-green-500" />} title="Downloadable PDF Reports" desc="Export your analytics and recommendations as a PDF for future reference or sharing with advisors." />
                             </div>
                             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
