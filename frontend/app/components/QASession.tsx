@@ -125,6 +125,14 @@ function SinglePersonaSession({
     });
   }, [endSession, onEnd, qa.transcriptEntries]);
 
+  // Auto-end session when time expires (hard frontend cutoff)
+  useEffect(() => {
+    if (qa.status === 'active' && qa.timer >= qaTimeLimitSec && !autoNavigatedRef.current) {
+      console.log('[QASession] Time expired — auto-ending session');
+      handleEndSession();
+    }
+  }, [qa.status, qa.timer, qaTimeLimitSec, handleEndSession]);
+
   useEffect(() => {
     if (qa.status === 'active') wasEverActiveRef.current = true;
   }, [qa.status]);
