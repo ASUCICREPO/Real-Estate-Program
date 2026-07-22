@@ -27,6 +27,8 @@ interface PersonaSelectionProps {
   onBaselineOverrideChange: (next: Partial<PersonaBestPractices> | null) => void;
   realtimeFeedbackDefault: boolean;
   onRealtimeFeedbackDefaultChange: (next: boolean) => void;
+  avatarEnabled: boolean;
+  onAvatarEnabledChange: (next: boolean) => void;
   sessionId: string;
   onContinue: () => void;
 }
@@ -157,6 +159,8 @@ export default function PersonaSelection({
   onBaselineOverrideChange,
   realtimeFeedbackDefault,
   onRealtimeFeedbackDefaultChange,
+  avatarEnabled,
+  onAvatarEnabledChange,
   sessionId,
   onContinue,
 }: PersonaSelectionProps) {
@@ -282,6 +286,24 @@ export default function PersonaSelection({
                         defaultSec={persona.qaTimeLimitSec ?? 300}
                         onChange={onQATimeLimitChange}
                       />
+                      {/* Avatar Toggle */}
+                      <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 2xl:px-8 2xl:py-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 2xl:text-xl">AI Avatar</h4>
+                            <p className="mt-0.5 text-xs text-gray-500 2xl:text-sm">Show a realistic talking avatar during Q&A</p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={avatarEnabled}
+                            onClick={() => onAvatarEnabledChange(!avatarEnabled)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-maroon/40 ${avatarEnabled ? 'bg-maroon' : 'bg-gray-200'}`}
+                          >
+                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${avatarEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+                      </div>
                       <RealtimeFeedbackToggle
                         value={realtimeFeedbackDefault}
                         onChange={onRealtimeFeedbackDefaultChange}

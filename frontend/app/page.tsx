@@ -53,6 +53,7 @@ export default function Home() {
   const [realtimeFeedbackDefault, setRealtimeFeedbackDefault] = useState<boolean>(
     ANALYSIS_CONFIG.SHOW_REALTIME_FEEDBACK,
   );
+  const [avatarEnabled, setAvatarEnabled] = useState<boolean>(true);
   const [pdfUploaded, setPdfUploaded] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>(generateSessionId);
@@ -318,6 +319,8 @@ export default function Home() {
             onBaselineOverrideChange={setBaselineOverride}
             realtimeFeedbackDefault={realtimeFeedbackDefault}
             onRealtimeFeedbackDefaultChange={setRealtimeFeedbackDefault}
+            avatarEnabled={avatarEnabled}
+            onAvatarEnabledChange={setAvatarEnabled}
             sessionId={sessionId}
             onContinue={handleContinueToUpload}
           />
@@ -363,6 +366,7 @@ export default function Home() {
             personaName={selectedPersonaName}
             personaNames={additionalPersonas.length > 0 ? [selectedPersonaName, ...additionalPersonas.map(p => p.name)] : undefined}
             personas={selectedPersonaData ? [selectedPersonaData as Persona, ...additionalPersonas] : undefined}
+            avatarEnabled={avatarEnabled}
             sessionId={sessionId}
             userId={userId || ''}
             qaTimeLimitSec={selectedPersonaQATimeLimit}

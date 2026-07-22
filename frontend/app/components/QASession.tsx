@@ -17,6 +17,7 @@ interface QASessionProps {
   personaName: string;
   personaNames?: string[];  // Display names matching personaIds
   personas?: Persona[];  // Full persona objects for multi-persona
+  avatarEnabled?: boolean;  // Toggle AI avatar on/off
   sessionId: string;
   userId: string;
   voiceId?: string;
@@ -371,6 +372,7 @@ export default function QASession({
   personaName,
   personaNames,
   personas,
+  avatarEnabled = true,
   sessionId,
   userId,
   voiceId,
@@ -432,7 +434,7 @@ export default function QASession({
   // ── Single-persona mode ──
   if (!isMultiPersona) {
     // Get anamPersonaId from personas array (if provided) or undefined
-    const singleAnamId = personas?.[0]?.anamPersonaId;
+    const singleAnamId = avatarEnabled ? personas?.[0]?.anamPersonaId : undefined;
     return (
       <SinglePersonaSession
         personaId={personaId}
@@ -527,7 +529,7 @@ export default function QASession({
       voiceId={getVoiceId(currentPersonaIndex)}
       qaTimeLimitSec={durationSec}
       previousContext={previousContext}
-      anamPersonaId={getAnamPersonaId(currentPersonaIndex)}
+      anamPersonaId={avatarEnabled ? getAnamPersonaId(currentPersonaIndex) : undefined}
       onBack={onBack}
       onEnd={handlePersonaEnd}
       onSkip={onSkip}
