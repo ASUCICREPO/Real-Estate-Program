@@ -21,6 +21,9 @@ import CalibrationPanel from './practice/CalibrationPanel';
 import MicCheckCard from './practice/MicCheckCard';
 import RealTimeFeedbackPanel from './practice/RealTimeFeedbackPanel';
 import TranscriptionPanel from './practice/TranscriptionPanel';
+import CompactMetricsBar from './practice/CompactMetricsBar';
+import PdfViewer from './practice/PdfViewer';
+import PdfPlaceholder from './practice/PdfPlaceholder';
 
 // ─── Processing phase labels ──────────────────────────────────────────
 
@@ -89,7 +92,6 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
 
   // PDF slide viewer
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [showSlides, setShowSlides] = useState(true);
 
   // Fetch PDF URL on mount if presentation was uploaded
   useEffect(() => {
@@ -98,11 +100,7 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
     }
   }, [hasPresentationPdf, sessionId]);
 
-  // Runtime toggle for real-time feedback panel — default comes from the
-  // persona-step toggle (with config fallback). User can flip during session.
-  const [showFeedback, setShowFeedback] = useState(
-    realtimeFeedbackDefault ?? ANALYSIS_CONFIG.SHOW_REALTIME_FEEDBACK,
-  );
+  // Runtime toggle for real-time feedback panel — removed as metrics are now always visible at top
 
   // Keep loop refs in sync with state so the rAF loop always sees fresh values
   // without needing to be recreated (which caused dual-loop races).
@@ -708,7 +706,7 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
   const showRightPanel = showFeedback || isCalibrating;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-3 sm:px-6 sm:py-4 2xl:max-w-[1600px] 2xl:py-8">
+    <div className="mx-auto w-full max-w-[1400px] px-4 py-3 sm:px-6 sm:py-4 2xl:max-w-[1800px] 2xl:py-8">
       {/* 1. Header Section */}
       <PracticeSessionHeader
         onBack={onBack}
@@ -719,124 +717,118 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
         onToggleFeedback={() => setShowFeedback((prev) => !prev)}
       />
 
-      <div className="flex flex-col lg:flex-row gap-4 2xl:gap-6">
-        {/* 2. Left Column: Camera View & Controls */}
-        <div
-          className="space-y-3 min-w-0"
-          style={{ flex: '2 1 0%' }}
-        >
-          <CameraView
-            videoRef={videoRef}
-            canvasRef={canvasRef}
-            cameraActive={cameraActive}
-            isRecording={isRecording}
-            isPaused={isPaused}
-            isCalibrating={isCalibrating}
-            permissionDenied={permissionDenied}
-            onStartCamera={startCamera}
-            onStartRecording={handleStartRecording}
-            onPauseRecording={handlePauseRecording}
-            onResumeRecording={handleResumeRecording}
-            onStopRecording={handleStopRecording}
-            onReEnterCalibration={() => { setCalibrationStep(1); setIsCalibrating(true); }}
-          />
-        </div>
-
-        {/* 3. Right Column: Calibration always here, Feedback only when toggled on */}
-        <div
-          className="space-y-4 min-w-0 overflow-hidden"
-          style={{
-            flex: showRightPanel ? '1 1 0%' : '0 0 0px',
-            opacity: showRightPanel ? 1 : 0,
-            transition: 'flex 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease',
-          }}
-        >
-          {showRightPanel && (
-            <>
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm 2xl:p-8 relative overflow-hidden animate-fade-in">
-                {isCalibrating ? (
-                  calibrationStep === 1 ? (
-                    <CalibrationPanel
-                      showMesh={showMesh}
-                      onToggleMesh={() => setShowMesh(!showMesh)}
-                      gazeStatus={gazeStatus}
-                    />
-                  ) : (
-                    <MicCheckCard micCalibration={micCalibration} onBack={() => setCalibrationStep(1)} />
-                  )
-                ) : (
-                  <RealTimeFeedbackPanel
-                    isRecording={isRecording && !isPaused}
-                    soundEnabled={soundEnabled}
-                    onToggleSound={() => setSoundEnabled(!soundEnabled)}
-                    isDistracted={gazeDisplayDistracted}
-                    metrics={feedbackMetrics}
-                    vocalVariety={vocalVariety.metrics}
-                    targets={targets}
-                  />
-                )}
-              </div>
-              {isCalibrating && calibrationStep === 1 && (
-                <button
-                  onClick={() => setCalibrationStep(2)}
-                  className="w-full rounded-lg bg-maroon px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-maroon-dark hover:shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-sans animate-fade-in"
-                >
-                  <span>Continue to Mic Calibration</span>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                    <path d="M5 12h14" />
-                    <path d="m12 5 7 7-7 7" />
-                  </svg>
-                </button>
-              )}
-              {isCalibrating && calibrationStep === 2 && (
-                <button
-                  onClick={() => setIsCalibrating(false)}
-                  className="w-full rounded-lg bg-maroon px-4 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-maroon-dark hover:shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-sans animate-fade-in"
-                >
-                  <span>Everything Looks Good</span>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 4. Live Transcription — hidden during calibration */}
+      {/* 2. Compact Metrics Bar at Top (shown when not calibrating) */}
       {!isCalibrating && (
-        <TranscriptionPanel
-          transcripts={transcripts}
-          partialTranscript={partialTranscript}
+        <CompactMetricsBar
           isRecording={isRecording && !isPaused}
-          isTranscribing={isTranscribing && isRecording && !isPaused}
+          isDistracted={gazeDisplayDistracted}
+          metrics={feedbackMetrics}
+          vocalVariety={vocalVariety.metrics}
+          targets={targets}
         />
       )}
 
-      {/* 5. Slide Viewer — shown when PDF was uploaded */}
-      {pdfUrl && (
-        <div className="mt-4 2xl:mt-6">
-          <button
-            onClick={() => setShowSlides(!showSlides)}
-            className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors font-sans"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showSlides ? 'rotate-90' : ''}`}>
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-            {showSlides ? 'Hide PDF' : 'View PDF'}
-          </button>
-          {showSlides && (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-              <iframe
-                src={pdfUrl}
-                className="w-full"
-                style={{ height: '500px' }}
-                title="Presentation Slides"
+      {/* 3. Main Content Area */}
+      {isCalibrating ? (
+        // Calibration Mode: Show calibration panels centered
+        <div className="max-w-2xl mx-auto">
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm 2xl:p-8">
+            {calibrationStep === 1 ? (
+              <CalibrationPanel
+                showMesh={showMesh}
+                onToggleMesh={() => setShowMesh(!showMesh)}
+                gazeStatus={gazeStatus}
+              />
+            ) : (
+              <MicCheckCard micCalibration={micCalibration} onBack={() => setCalibrationStep(1)} />
+            )}
+          </div>
+
+          {/* Calibration Buttons */}
+          {calibrationStep === 1 && (
+            <button
+              onClick={() => setCalibrationStep(2)}
+              className="w-full mt-4 rounded-lg bg-maroon px-4 py-3 text-sm font-bold text-white shadow-lg hover:bg-maroon-dark hover:shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-sans"
+            >
+              <span>Continue to Mic Calibration</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </button>
+          )}
+          {calibrationStep === 2 && (
+            <button
+              onClick={() => setIsCalibrating(false)}
+              className="w-full mt-4 rounded-lg bg-maroon px-4 py-3 text-sm font-bold text-white shadow-lg hover:bg-maroon-dark hover:shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-sans"
+            >
+              <span>Everything Looks Good</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </button>
+          )}
+
+          {/* Camera preview during calibration */}
+          <div className="mt-4">
+            <CameraView
+              videoRef={videoRef}
+              canvasRef={canvasRef}
+              cameraActive={cameraActive}
+              isRecording={isRecording}
+              isPaused={isPaused}
+              isCalibrating={isCalibrating}
+              permissionDenied={permissionDenied}
+              onStartCamera={startCamera}
+              onStartRecording={handleStartRecording}
+              onPauseRecording={handlePauseRecording}
+              onResumeRecording={handleResumeRecording}
+              onStopRecording={handleStopRecording}
+              onReEnterCalibration={() => { setCalibrationStep(1); setIsCalibrating(true); }}
+            />
+          </div>
+        </div>
+      ) : (
+        // Recording Mode: Side-by-side layout with 40/60 split
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 2xl:gap-6">
+            {/* Left: Camera/Recording View (2 columns = 40%) */}
+            <div className="lg:col-span-2 min-w-0">
+              <CameraView
+                videoRef={videoRef}
+                canvasRef={canvasRef}
+                cameraActive={cameraActive}
+                isRecording={isRecording}
+                isPaused={isPaused}
+                isCalibrating={isCalibrating}
+                permissionDenied={permissionDenied}
+                onStartCamera={startCamera}
+                onStartRecording={handleStartRecording}
+                onPauseRecording={handlePauseRecording}
+                onResumeRecording={handleResumeRecording}
+                onStopRecording={handleStopRecording}
+                onReEnterCalibration={() => { setCalibrationStep(1); setIsCalibrating(true); }}
               />
             </div>
-          )}
-        </div>
+
+            {/* Right: PDF Viewer or Placeholder (3 columns = 60%) */}
+            <div className="lg:col-span-3 min-w-0">
+              {pdfUrl ? (
+                <PdfViewer pdfUrl={pdfUrl} />
+              ) : (
+                <PdfPlaceholder />
+              )}
+            </div>
+          </div>
+
+          {/* 4. Live Transcription Below Side-by-Side Layout */}
+          <TranscriptionPanel
+            transcripts={transcripts}
+            partialTranscript={partialTranscript}
+            isRecording={isRecording && !isPaused}
+            isTranscribing={isTranscribing && isRecording && !isPaused}
+          />
+        </>
       )}
 
     </div>
