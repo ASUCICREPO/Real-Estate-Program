@@ -703,8 +703,6 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
     pauses: audioMetrics.pauses,
   };
 
-  const showRightPanel = showFeedback || isCalibrating;
-
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-3 sm:px-6 sm:py-4 2xl:max-w-[1800px] 2xl:py-8">
       {/* 1. Header Section */}
@@ -713,8 +711,6 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
         timer={timer}
         maxDurationSec={maxDuration}
         personaTitle={personaTitle}
-        showFeedback={showFeedback}
-        onToggleFeedback={() => setShowFeedback((prev) => !prev)}
       />
 
       {/* 2. Compact Metrics Bar at Top (shown when not calibrating) */}
