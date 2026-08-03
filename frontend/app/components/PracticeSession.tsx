@@ -725,9 +725,12 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
       )}
 
       {/* 3. Main Content Area */}
-      {isCalibrating ? (
-        // Calibration Mode: Show calibration panels centered
-        <div className="max-w-2xl mx-auto">
+      {/* NOTE: CameraView is ALWAYS mounted to keep the video stream alive.
+          Calibration panels overlay on top and are shown/hidden via CSS. */}
+
+      {/* Calibration overlay panels — visible only during calibration */}
+      {isCalibrating && (
+        <div className="max-w-2xl mx-auto mb-4">
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm 2xl:p-8">
             {calibrationStep === 1 ? (
               <CalibrationPanel
@@ -739,8 +742,6 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
               <MicCheckCard micCalibration={micCalibration} onBack={() => setCalibrationStep(1)} />
             )}
           </div>
-
-          {/* Calibration Buttons */}
           {calibrationStep === 1 && (
             <button
               onClick={() => setCalibrationStep(2)}
@@ -764,67 +765,50 @@ export default function PracticeSession({ personaTitle, personaId, sessionId, ti
               </svg>
             </button>
           )}
-
-          {/* Camera preview during calibration */}
-          <div className="mt-4">
-            <CameraView
-              videoRef={videoRef}
-              canvasRef={canvasRef}
-              cameraActive={cameraActive}
-              isRecording={isRecording}
-              isPaused={isPaused}
-              isCalibrating={isCalibrating}
-              permissionDenied={permissionDenied}
-              onStartCamera={startCamera}
-              onStartRecording={handleStartRecording}
-              onPauseRecording={handlePauseRecording}
-              onResumeRecording={handleResumeRecording}
-              onStopRecording={handleStopRecording}
-              onReEnterCalibration={() => { setCalibrationStep(1); setIsCalibrating(true); }}
-            />
-          </div>
         </div>
-      ) : (
-        // Recording Mode: Side-by-side layout with 40/60 split
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 2xl:gap-6">
-            {/* Left: Camera/Recording View (2 columns = 40%) */}
-            <div className="lg:col-span-2 min-w-0">
-              <CameraView
-                videoRef={videoRef}
-                canvasRef={canvasRef}
-                cameraActive={cameraActive}
-                isRecording={isRecording}
-                isPaused={isPaused}
-                isCalibrating={isCalibrating}
-                permissionDenied={permissionDenied}
-                onStartCamera={startCamera}
-                onStartRecording={handleStartRecording}
-                onPauseRecording={handlePauseRecording}
-                onResumeRecording={handleResumeRecording}
-                onStopRecording={handleStopRecording}
-                onReEnterCalibration={() => { setCalibrationStep(1); setIsCalibrating(true); }}
-              />
-            </div>
+      )}
 
-            {/* Right: PDF Viewer or Placeholder (3 columns = 60%) */}
-            <div className="lg:col-span-3 min-w-0">
-              {pdfUrl ? (
-                <PdfViewer pdfUrl={pdfUrl} />
-              ) : (
-                <PdfPlaceholder />
-              )}
-            </div>
-          </div>
-
-          {/* 4. Live Transcription Below Side-by-Side Layout */}
-          <TranscriptionPanel
-            transcripts={transcripts}
-            partialTranscript={partialTranscript}
-            isRecording={isRecording && !isPaused}
-            isTranscribing={isTranscribing && isRecording && !isPaused}
+      {/* Main side-by-side layout — CameraView always mounted, PDF shown only when not calibrating */}
+      <div className={`grid grid-cols-1 gap-4 2xl:gap-6 ${isCalibrating ? 'lg:grid-cols-1 max-w-2xl mx-auto' : 'lg:grid-cols-5'}`}>
+        {/* Left: Camera/Recording View — always rendered to keep stream alive */}
+        <div className={isCalibrating ? 'w-full' : 'lg:col-span-2 min-w-0'}>
+          <CameraView
+            videoRef={videoRef}
+            canvasRef={canvasRef}
+            cameraActive={cameraActive}
+            isRecording={isRecording}
+            isPaused={isPaused}
+            isCalibrating={isCalibrating}
+            permissionDenied={permissionDenied}
+            onStartCamera={startCamera}
+            onStartRecording={handleStartRecording}
+            onPauseRecording={handlePauseRecording}
+            onResumeRecording={handleResumeRecording}
+            onStopRecording={handleStopRecording}
+            onReEnterCalibration={() => { setCalibrationStep(1); setIsCalibrating(true); }}
           />
-        </>
+        </div>
+
+        {/* Right: PDF Viewer or Placeholder — hidden during calibration */}
+        {!isCalibrating && (
+          <div className="lg:col-span-3 min-w-0">
+            {pdfUrl ? (
+              <PdfViewer pdfUrl={pdfUrl} />
+            ) : (
+              <PdfPlaceholder />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Live Transcription — hidden during calibration */}
+      {!isCalibrating && (
+        <TranscriptionPanel
+          transcripts={transcripts}
+          partialTranscript={partialTranscript}
+          isRecording={isRecording && !isPaused}
+          isTranscribing={isTranscribing && isRecording && !isPaused}
+        />
       )}
 
     </div>
