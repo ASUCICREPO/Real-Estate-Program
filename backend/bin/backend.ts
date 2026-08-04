@@ -27,6 +27,10 @@ const githubRepo = app.node.tryGetContext('githubRepo') as string | undefined;
 const githubToken = app.node.tryGetContext('githubToken') as string | undefined;
 const useGitHub = !!(githubOwner && githubRepo && githubToken);
 
+// Optional: pre-built AgentCore image URI (required for CloudShell where Docker is unavailable)
+// Usage: cdk deploy -c agentCoreImageUri=<account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+const agentCoreImageUri = app.node.tryGetContext('agentCoreImageUri') as string | undefined;
+
 // ──────────────────────────────────────────────────────────
 // 1. Amplify Hosting — creates Amplify App, gets appId + domain
 // ──────────────────────────────────────────────────────────
@@ -65,6 +69,7 @@ const agentCore = new AgentCoreStack(app, `AgentCoreStack-${branchName}`, {
   guardrailId: backend.guardrailId,
   guardrailVersion: backend.guardrailVersion,
   guardrailArn: backend.guardrailArn,
+  agentCoreImageUri,
 });
 
 // ──────────────────────────────────────────────────────────
