@@ -1,283 +1,356 @@
-# Deployment Guide
-
-This guide provides step-by-step instructions for deploying [INSERT_PROJECT_NAME].
+# Deployment Guide — W. P. Carey Real Estate Program AI Presentation Coach
 
 ---
 
 ## Table of Contents
 
-- [Deployment Guide](#deployment-guide)
-  - [Requirements](#requirements)
-  - [Pre-Deployment](#pre-deployment)
-    - [AWS Account Setup](#aws-account-setup)
-    - [CLI Tools Installation](#cli-tools-installation)
-    - [Environment Configuration](#environment-configuration)
-  - [Deployment](#deployment)
-    - [Backend Deployment](#backend-deployment)
-    - [Frontend Deployment](#frontend-deployment)
-  - [Post-Deployment Verification](#post-deployment-verification)
-  - [Troubleshooting](#troubleshooting)
+- [Requirements](#requirements)
+- [Pre-Deployment Setup](#pre-deployment-setup)
+- [Backend Deployment (CDK)](#backend-deployment-cdk)
+- [AgentCore Deployment](#agentcore-deployment)
+- [Frontend Deployment (Amplify)](#frontend-deployment-amplify)
+- [Post-Deployment Configuration](#post-deployment-configuration)
+- [Re-deploying Frontend Changes](#re-deploying-frontend-changes)
+- [Teardown](#teardown)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Requirements
 
-Before you deploy, you must have the following:
-
 ### Accounts
-- [ ] **AWS Account** - [Create an AWS Account](https://aws.amazon.com/)
-- [ ] [INSERT_ADDITIONAL_ACCOUNT_REQUIREMENTS]
+- [ ] **AWS Account** with sufficient permissions (see below)
+- [ ] **Anam AI Account** — [https://app.anam.ai](https://app.anam.ai) — needed for avatar session tokens
 
 ### CLI Tools
-- [ ] **AWS CLI** (v2.x) - [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [ ] **Node.js** (v18.x or later) - [Install Node.js](https://nodejs.org/)
-- [ ] **npm** (v9.x or later) - Included with Node.js
-- [ ] **AWS CDK** (v2.x) - Install via `npm install -g aws-cdk`
-- [ ] [INSERT_ADDITIONAL_CLI_TOOLS]
+- [ ] **AWS CLI v2** — [Install](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- [ ] **Node.js 18+** — [Install](https://nodejs.org/)
+- [ ] **AWS CDK v2** — `npm install -g aws-cdk`
+- [ ] **Docker** — required to build the AgentCore container image
+- [ ] **Python 3.13** — required for the AgentCore image and Lambda layer bundling
 
-### Access Permissions
-- [ ] AWS IAM user/role with permissions for:
-  - CloudFormation
-  - Lambda
-  - API Gateway
-  - S3
-  - [INSERT_ADDITIONAL_AWS_SERVICES]
-- [ ] [INSERT_ADDITIONAL_PERMISSIONS]
+### AWS IAM Permissions
+The deploying IAM user/role needs permissions for:
+CloudFormation, Lambda, API Gateway, S3, DynamoDB, Cognito, Bedrock, ECR, Bedrock AgentCore, Amplify, IAM, CloudWatch Logs
 
-### Software Dependencies
-- [ ] Git - [Install Git](https://git-scm.com/downloads)
-- [ ] [INSERT_ADDITIONAL_DEPENDENCIES]
+### Bedrock Model Access
+Enable the following models in your AWS account (us-east-1):
+- `amazon.nova-lite-v1:0`
+- `amazon.nova-2-sonic-v1:0`
+- `global.amazon.nova-2-lite-v1:0` (cross-region inference profile)
 
 ---
 
-## Pre-Deployment
+## Pre-Deployment Setup
 
-### AWS Account Setup
+### 1. Clone the repository
 
-1. **Configure AWS CLI**
-   ```bash
-   aws configure
-   ```
-   Enter your:
-   - AWS Access Key ID
-   - AWS Secret Access Key
-   - Default region: `us-east-1` (or [INSERT_PREFERRED_REGION])
-   - Default output format: `json`
+```bash
+git clone https://github.com/ASUCICREPO/Real-Estate-Program.git
+cd Real-Estate-Program
+```
 
-2. **Bootstrap CDK** (first-time CDK users only)
-   ```bash
-   cdk bootstrap aws://[ACCOUNT_ID]/[REGION]
-   ```
-   > **[PLACEHOLDER]** Replace `[ACCOUNT_ID]` with your AWS account ID and `[REGION]` with your deployment region
+### 2. Configure AWS credentials
 
-### CLI Tools Installation
+```bash
+aws configure --profile <your-profile>
+# Enter: Access Key ID, Secret Access Key, region (us-east-1), output (json)
+```
 
-1. **Install Node.js dependencies for backend**
-   ```bash
-   cd backend
-   npm install
-   ```
+Or if using SSO:
+```bash
+aws sso login --profile <your-profile>
+```
 
-2. **Install Node.js dependencies for frontend**
-   ```bash
-   cd frontend
-   npm install
-   ```
+### 3. Bootstrap CDK (first-time only per account/region)
 
-3. **Install AWS CDK globally** (if not already installed)
-   ```bash
-   npm install -g aws-cdk
-   ```
+```bash
+cd backend
+cdk bootstrap aws://<ACCOUNT_ID>/us-east-1 --profile <your-profile>
+```
 
-### Environment Configuration
+### 4. Install backend dependencies
 
-1. **Create environment configuration file**
-   
-   [INSERT_ENV_CONFIGURATION_INSTRUCTIONS]
-   
-   ```bash
-   # Example: Create .env file
-   cp .env.example .env
-   ```
+```bash
+cd backend
+npm install
+```
 
-2. **Configure required environment variables**
-   
-   [INSERT_ENV_VARIABLES_TABLE]
-   
-   | Variable | Description | Example |
-   |----------|-------------|---------|
-   | `[INSERT_VAR_1]` | [INSERT_DESCRIPTION] | [INSERT_EXAMPLE] |
-   | `[INSERT_VAR_2]` | [INSERT_DESCRIPTION] | [INSERT_EXAMPLE] |
-   | `[INSERT_VAR_3]` | [INSERT_DESCRIPTION] | [INSERT_EXAMPLE] |
+### 5. Get your Anam API key
 
-3. **[INSERT_ADDITIONAL_CONFIGURATION_STEPS]**
-   
-   > **Important**: [INSERT_IMPORTANT_NOTES]
+Log into [https://app.anam.ai](https://app.anam.ai) → Account Settings → API Keys → copy your key.
 
 ---
 
-## Deployment
+## Backend Deployment (CDK)
 
-### Backend Deployment
+### 1. Set required environment variables
 
-1. **Navigate to the backend directory**
-   ```bash
-   cd backend
-   ```
+```bash
+export ANAM_API_KEY="<your-anam-api-key>"
+```
 
-2. **Synthesize the CloudFormation template** (optional, for review)
-   ```bash
-   cdk synth
-   ```
+### 2. (Optional) Review the synthesized CloudFormation
 
-3. **Deploy the backend stack**
-   ```bash
-   cdk deploy
-   ```
-   
-   When prompted:
-   - Review the IAM changes
-   - Type `y` to confirm deployment
+```bash
+cd backend
+cdk synth --profile <your-profile>
+```
 
-4. **Note the outputs**
-   
-   After deployment, note down the following outputs:
-   - **API Endpoint**: `[INSERT_OUTPUT_NAME]`
-   - **[INSERT_ADDITIONAL_OUTPUT]**: [INSERT_DESCRIPTION]
-   
-   > **Important**: Save these values as they will be needed for frontend configuration
+### 3. Deploy all stacks
 
-### Frontend Deployment
+```bash
+cd backend
+cdk deploy --all --profile <your-profile>
+```
 
-1. **Navigate to the frontend directory**
-   ```bash
-   cd frontend
-   ```
+When prompted, review IAM changes and type `y` to confirm.
 
-2. **Configure the frontend environment**
-   
-   [INSERT_FRONTEND_CONFIG_INSTRUCTIONS]
-   
-   ```bash
-   # Example: Update API endpoint
-   echo "NEXT_PUBLIC_API_URL=[YOUR_API_ENDPOINT]" >> .env.local
-   ```
+This deploys four stacks:
+- `RealEstateProgramStack-main` — core infrastructure (Cognito, S3, DynamoDB, API Gateway, Lambdas, Guardrails)
+- `AgentCoreStack-main` — Bedrock AgentCore runtime
+- `AmplifyHostingStack-main` — Amplify app and branch
+- `FrontendConfigStack-main` — injects CDK outputs as Amplify environment variables
 
-3. **Build the frontend**
-   ```bash
-   npm run build
-   ```
+### 4. Note the CDK outputs
 
-4. **Deploy the frontend**
-   
-   [INSERT_FRONTEND_DEPLOYMENT_METHOD]
-   
-   **Option A: Deploy to Vercel**
-   ```bash
-   npx vercel --prod
-   ```
-   
-   **Option B: Deploy to AWS Amplify**
-   ```bash
-   [INSERT_AMPLIFY_COMMANDS]
-   ```
-   
-   **Option C: [INSERT_ALTERNATIVE_DEPLOYMENT]**
-   ```bash
-   [INSERT_COMMANDS]
-   ```
+After deployment completes, you'll see outputs like:
+
+```
+RealEstateProgramStack-main.UserPoolId         = us-east-1_XXXXXXXXX
+RealEstateProgramStack-main.UserPoolClientId   = XXXXXXXXXXXXXXXXXXXXXXXXXX
+RealEstateProgramStack-main.IdentityPoolId     = us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+RealEstateProgramStack-main.ApiUrl             = https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/prod/
+RealEstateProgramStack-main.UploadsBucketName  = realestateuploadsbucket-main-XXXX
+AgentCoreStack-main.WebSocketApiUrl            = wss://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/prod/
+```
+
+Save these — you'll need them for the frontend configuration.
 
 ---
 
-## Post-Deployment Verification
+## AgentCore Deployment
 
-### Verify Backend Deployment
+The AgentCore stack builds and pushes the voice agent Docker image automatically during `cdk deploy --all`. If you need to redeploy the agent image separately:
 
-1. **Check CloudFormation stack status**
-   ```bash
-   aws cloudformation describe-stacks --stack-name [INSERT_STACK_NAME]
-   ```
-   
-   Expected status: `CREATE_COMPLETE` or `UPDATE_COMPLETE`
+```bash
+cd backend/agentcore
 
-2. **Test API endpoint**
-   ```bash
-   curl -X GET [INSERT_API_ENDPOINT]/[INSERT_TEST_PATH]
-   ```
-   
-   Expected response: [INSERT_EXPECTED_RESPONSE]
+# Build the image
+docker build -t real-estate-agentcore .
 
-3. **Check Lambda functions**
-   ```bash
-   aws lambda list-functions --query "Functions[?contains(FunctionName, '[INSERT_FUNCTION_PREFIX]')]"
-   ```
+# Authenticate to ECR (replace <account> and <region>)
+aws ecr get-login-password --region us-east-1 --profile <your-profile> | \
+  docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com
 
-### Verify Frontend Deployment
+# Tag and push
+docker tag real-estate-agentcore:latest \
+  <account>.dkr.ecr.us-east-1.amazonaws.com/real-estate-agentcore:latest
+docker push <account>.dkr.ecr.us-east-1.amazonaws.com/real-estate-agentcore:latest
+```
 
-1. **Access the application**
-   
-   Navigate to: `[INSERT_FRONTEND_URL]`
+Then update the AgentCore runtime to use the new image via the AWS Console or CLI.
 
-2. **Test basic functionality**
-   - [ ] [INSERT_TEST_CASE_1]
-   - [ ] [INSERT_TEST_CASE_2]
-   - [ ] [INSERT_TEST_CASE_3]
+---
+
+## Frontend Deployment (Amplify)
+
+The frontend is a Next.js static export deployed as a zip to AWS Amplify. The `FrontendConfigStack` automatically injects the CDK outputs as Amplify environment variables, so the build picks them up automatically.
+
+### 1. Install frontend dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### 2. Create a local env file (for local dev only — not needed for Amplify)
+
+```bash
+cat > frontend/.env.local << EOF
+NEXT_PUBLIC_COGNITO_REGION=us-east-1
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=<UserPoolId from CDK output>
+NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID=<UserPoolClientId from CDK output>
+NEXT_PUBLIC_COGNITO_IDENTITY_POOL_ID=<IdentityPoolId from CDK output>
+NEXT_PUBLIC_API_BASE_URL=<ApiUrl from CDK output>
+NEXT_PUBLIC_WEBSOCKET_API_URL=<WebSocketApiUrl from CDK output>
+EOF
+```
+
+### 3. Build the static export
+
+```bash
+cd frontend
+npm run build
+# Output goes to frontend/out/
+```
+
+### 4. Package the build (index.html must be at zip root)
+
+```bash
+cd frontend/out
+zip -r ../../deploy.zip .
+cd ../..
+```
+
+### 5. Deploy to Amplify
+
+```bash
+# Create a deployment slot and get the upload URL
+aws amplify create-deployment \
+  --app-id <AMPLIFY_APP_ID> \
+  --branch-name main \
+  --profile <your-profile> > /tmp/deploy_response.json
+
+# Extract job ID and upload URL
+JOB_ID=$(python3 -c "import json; print(json.load(open('/tmp/deploy_response.json'))['jobId'])")
+UPLOAD_URL=$(python3 -c "import json; print(json.load(open('/tmp/deploy_response.json'))['zipUploadUrl'])")
+
+# Upload the zip
+curl --request PUT --upload-file deploy.zip "$UPLOAD_URL"
+
+# Start the deployment
+aws amplify start-deployment \
+  --app-id <AMPLIFY_APP_ID> \
+  --branch-name main \
+  --job-id "$JOB_ID" \
+  --profile <your-profile>
+```
+
+The Amplify App ID is in the `AmplifyHostingStack-main` CDK outputs, or find it with:
+
+```bash
+aws amplify list-apps --profile <your-profile> \
+  --query 'apps[*].{name:name,appId:appId}' --output table
+```
+
+### 6. Monitor the deployment
+
+```bash
+aws amplify get-job \
+  --app-id <AMPLIFY_APP_ID> \
+  --branch-name main \
+  --job-id "$JOB_ID" \
+  --profile <your-profile> \
+  --query 'job.summary.{status:status,endTime:endTime}'
+```
+
+Status will be `SUCCEED` when live (usually under 60 seconds for a static zip deploy).
+
+---
+
+## Post-Deployment Configuration
+
+### Set the Anam API key on the Lambda
+
+The `ANAM_API_KEY` environment variable must be set on the `AnamSessionTokenLambda`. If you ran `cdk deploy` with `ANAM_API_KEY` exported, this is done automatically. To update it manually:
+
+```bash
+aws lambda update-function-configuration \
+  --function-name <AnamSessionTokenLambda function name> \
+  --environment '{"Variables":{"ANAM_API_KEY":"<your-key>","ALLOWED_ORIGINS":"http://localhost:3000,https://main.<amplify-id>.amplifyapp.com"}}' \
+  --profile <your-profile>
+```
+
+Find the function name:
+```bash
+aws lambda list-functions --profile <your-profile> \
+  --query 'Functions[?contains(FunctionName,`Anam`)].FunctionName' --output text
+```
+
+### Seed the Personas
+
+The DynamoDB `PersonasTable` is empty on first deploy. You need to insert the four persona records. Use the AWS Console DynamoDB editor or a seed script. Each item requires:
+
+```json
+{
+  "personaID": "<uuid>",
+  "name": "Commercial Lender",
+  "description": "...",
+  "personaPrompt": "...",
+  "timeLimitSec": 900,
+  "qaTimeLimitSec": 300,
+  "anamPersonaId": "26981553-4601-4799-b64b-7dfa1580de8c",
+  "voiceId": "matthew",
+  "bestPractices": {
+    "wpm": { "min": 130, "max": 160 },
+    "eyeContact": { "min": 65 },
+    "fillerWords": { "max": 3 },
+    "pauses": { "min": 4 }
+  }
+}
+```
+
+Anam persona IDs:
+| Persona | Anam Persona ID |
+|---------|----------------|
+| Commercial Lender | `26981553-4601-4799-b64b-7dfa1580de8c` |
+| Public Official | `855745e8-056d-4848-a5a0-3752e88cdecc` |
+| Real Estate Agent | `36908df0-128e-48c6-b2f3-cbf007707d00` |
+| Negotiation Counterparty | `19e62cdb-8c39-4b58-a96b-a8a4cc5899e0` |
+
+---
+
+## Re-deploying Frontend Changes
+
+When you make frontend code changes:
+
+```bash
+# 1. Build
+cd frontend && npm run build
+
+# 2. Repackage from inside out/
+cd out && zip -r ../../deploy.zip . && cd ../..
+
+# 3. Deploy (same 3-command flow as above)
+aws amplify create-deployment --app-id <ID> --branch-name main --profile <profile> > /tmp/r.json
+curl --request PUT --upload-file deploy.zip "$(python3 -c "import json; print(json.load(open('/tmp/r.json'))['zipUploadUrl'])")"
+aws amplify start-deployment --app-id <ID> --branch-name main \
+  --job-id "$(python3 -c "import json; print(json.load(open('/tmp/r.json'))['jobId'])")" --profile <profile>
+```
+
+---
+
+## Teardown
+
+To remove all AWS resources:
+
+```bash
+cd backend
+cdk destroy --all --profile <your-profile>
+```
+
+> **Warning**: This deletes all DynamoDB data, S3 session recordings, and Cognito user accounts permanently. Back up anything you need before running this.
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
-
-#### Issue: [INSERT_COMMON_ISSUE_1]
-**Symptoms**: [INSERT_SYMPTOMS]
-
-**Solution**:
+### `cdk deploy` fails: "not bootstrapped"
 ```bash
-[INSERT_SOLUTION_COMMANDS]
+cdk bootstrap aws://<ACCOUNT_ID>/<REGION> --profile <your-profile>
 ```
 
-#### Issue: [INSERT_COMMON_ISSUE_2]
-**Symptoms**: [INSERT_SYMPTOMS]
+### `cdk deploy` fails: "Docker daemon not running"
+The AgentCore stack builds a Docker image. Start Docker Desktop and retry.
 
-**Solution**:
-[INSERT_SOLUTION_STEPS]
+### Lambda returns 500 on `/anam-session`
+The `ANAM_API_KEY` is empty or invalid. Check the Lambda environment variable and confirm the key is active in the Anam dashboard.
 
-#### Issue: CDK Bootstrap Error
-**Symptoms**: Error message about CDK not being bootstrapped
-
-**Solution**:
+### Amplify deploy returns 404
+The zip was built from the wrong directory. `index.html` must be at the root of the zip:
 ```bash
-cdk bootstrap aws://[ACCOUNT_ID]/[REGION]
+# Correct — run from inside out/
+cd frontend/out && zip -r ../../deploy.zip .
 ```
 
-#### Issue: Permission Denied
-**Symptoms**: Access denied errors during deployment
+### Frontend shows "CORS error" on API calls
+The Amplify app URL must be in the `ALLOWED_ORIGINS` environment variable on each Lambda. Redeploy the CDK stack with the correct `allowedOrigins` in `bin/backend.ts`.
 
-**Solution**:
-- Verify your AWS credentials are configured correctly
-- Ensure your IAM user/role has the required permissions
-- Check if you're deploying to the correct region
+### Voice Q&A WebSocket disconnects immediately
+- Confirm `NEXT_PUBLIC_WEBSOCKET_API_URL` ends with `/` and matches the AgentCore endpoint
+- Check the AgentCore runtime health in the AWS Console (Bedrock → AgentCore → Runtimes)
+- Review AgentCore CloudWatch logs at `/aws/bedrock-agentcore/runtimes/<runtime-name>-DEFAULT`
 
----
-
-## Cleanup
-
-To remove all deployed resources:
-
-```bash
-cd backend
-cdk destroy
-```
-
-> **Warning**: This will delete all resources created by this stack. Make sure to backup any important data before proceeding.
-
----
-
-## Next Steps
-
-After successful deployment:
-1. Review the [User Guide](./userGuide.md) to learn how to use the application
-2. Check the [API Documentation](./APIDoc.md) for integration details
-3. See the [Modification Guide](./modificationGuide.md) for customization options
-
+### Bedrock model access denied
+Enable Nova Lite and Nova 2 Sonic in the Bedrock console under **Model access** for `us-east-1`.
