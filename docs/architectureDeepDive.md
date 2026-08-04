@@ -1,6 +1,4 @@
-# Architecture Deep Dive
-
-This document provides a detailed explanation of the [INSERT_PROJECT_NAME] architecture.
+# Architecture Deep Dive — W. P. Carey Real Estate Program AI Presentation Coach
 
 ---
 
@@ -8,191 +6,203 @@ This document provides a detailed explanation of the [INSERT_PROJECT_NAME] archi
 
 ![Architecture Diagram](./media/architecture.png)
 
-> **[PLACEHOLDER]** Architecture diagram needed. Please create a diagram showing the complete system architecture and save it as `docs/media/architecture.png`
+---
+
+## System Overview
+
+The platform is a fully serverless AWS application. There are no EC2 instances or containers in the critical path — the only long-running compute is the Bedrock AgentCore runtime, which runs as a managed container for the live voice Q&A feature.
 
 ---
 
-## Architecture Flow
+## End-to-End Request Flow
 
-The following describes the step-by-step flow of how the system processes requests:
+### 1. Authentication
+Students and faculty sign in via Amazon Cognito (email + password). The Cognito Identity Pool issues temporary AWS credentials used directly by the browser for two operations: signing Amazon Transcribe WebSocket connections and uploading files to S3 via pre-signed URLs.
 
-### 1. User Interaction
-[INSERT_STEP_1_DESCRIPTION - Describe how users interact with the system, e.g., "User accesses the chatbot through the web interface"]
+### 2. Persona Selection
+The frontend calls `GET /personas` (API Gateway → Lambda → DynamoDB) to load the list of stakeholder personas. Each persona record includes the role name, description, coaching prompt, time limits, best-practice thresholds (target WPM, eye contact %, filler word ceiling, pause targets), Anam avatar persona ID, and Nova Sonic voice ID.
 
-### 2. Request Processing
-[INSERT_STEP_2_DESCRIPTION - Describe how requests are received and processed]
+### 3. Session Setup
+Before recording, the student can upload a PDF presentation (`POST /s3_urls` → pre-signed PUT → S3) and optionally add custom persona notes. These are stored under `{userId}/{sessionId}/` in S3.
 
-### 3. [INSERT_STEP_3_NAME]
-[INSERT_STEP_3_DESCRIPTION]
+### 4. Camera Calibration
+The browser activates the webcam/microphone stream. MediaPipe Face Landmarker runs locally (WASM) at up to 30 fps to detect face position and eye gaze blendshapes. A mic volume meter (AudioWorklet) confirms audio is audible before recording starts.
 
-### 4. [INSERT_STEP_4_NAME]
-[INSERT_STEP_4_DESCRIPTION]
+### 5. Practice Recording
+Once recording starts, three parallel processes run client-side:
 
-### 5. Response Generation
-[INSERT_STEP_5_DESCRIPTION - Describe how responses are generated and returned to the user]
+- **Video recording**: `MediaRecorder` chunks the webcam stream into WebM segments (90-second intervals). Each chunk is uploaded to S3 as a multipart upload part via a pre-signed URL.
+- **Live transcription**: Raw PCM audio is streamed to Amazon Transcribe Streaming over a SigV4-signed WebSocket. Partial and final transcripts appear in the UI in real time. Filler word detection, speaking pace (30-second rolling window), and pause detection run on the transcript stream.
+- **Gaze analysis**: The MediaPipe rAF loop runs continuously, computing eye blendshape scores and setting a debounced "distracted" flag after 3 seconds of sustained look-away. An audio alert plays if the student looks away too long.
+
+Delivery metrics (WPM, volume %, eye contact, filler words, pauses, monotone level from pitch variance) are sampled once per second and displayed in the compact metrics bar at the top of the practice view. Per-second snapshots are batched and uploaded to S3 as `detailed_metrics.json`.
+
+### 6. Session Completion
+When the student stops recording, the browser:
+1. Finalises the multipart video upload
+2. Uploads `session_analytics.json`, `transcript.json`, `detailed_metrics.json`, and a `manifest.json` coordination file to S3
+3. Calls `GET /analytics?sessionId=...` which polls the Post-Meeting Analytics Lambda until analysis is ready
+
+The analytics Lambda reads the session files from S3, constructs a structured prompt with persona context and delivery metrics, and invokes Amazon Bedrock (Nova Lite via cross-region inference profile) using structured output (tool use) to produce role-specific written feedback. Results are saved back to S3 and returned to the client.
+
+### 7. Live Voice Q&A (Optional)
+After reviewing written feedback, the student can start a live Q&A session. The browser:
+1. Calls `POST /anam-session` to exchange a session token with Anam AI (for the avatar face)
+2. Connects via WebSocket to the Bedrock AgentCore runtime
+3. Sends a `setup` frame with `personaId`, `userId`, `sessionId`, and `voiceId`
+
+The AgentCore container loads the persona from DynamoDB, retrieves the presentation transcript from S3, builds a Jinja2 system prompt, and runs a `BidiAgent` (Nova 2 Sonic) with:
+- **Bidirectional audio streaming**: raw PCM in at 16 kHz, PCM audio out
+- **Guardrail gate**: a speculative transcript buffer screens agent output against Bedrock Guardrails before audio is released to the client, with a 120-character / sentence-boundary trigger
+- **Session time guard**: a hook monitors elapsed time and injects wrap-up nudges at 30s remaining, then forces `stop_conversation`
+- **QA analytics**: at session end, Bedrock (Nova Lite) generates a structured Q&A quality summary and saves it to S3
 
 ---
 
-## Cloud Services / Technology Stack
+## Technology Stack
 
 ### Frontend
-- **Next.js**: [INSERT_NEXTJS_USAGE_DESCRIPTION - e.g., "React framework for the web application interface"]
-  - App Router for page routing
-  - [INSERT_ADDITIONAL_FRONTEND_DETAILS]
+- **Next.js 16** (App Router, static export `output: 'export'`)
+- **React 19**, **TypeScript**, **Tailwind CSS**
+- **MediaPipe Face Landmarker** — client-side gaze detection (WASM)
+- **Amazon Transcribe Streaming SDK** — real-time speech-to-text over WebSocket
+- **AWS Amplify JS SDK** — Cognito auth, S3 transfers
+- **Anam AI SDK** (`@anam-ai/js-sdk`) — avatar rendering and audio sync
+- **Zustand** — client state management
+- **Sonner** — toast notifications
 
-### Backend Infrastructure
-- **AWS CDK**: Infrastructure as Code for deploying AWS resources
-  - Defines all cloud infrastructure in TypeScript
-  - Enables reproducible deployments
+### Backend Infrastructure (AWS CDK — TypeScript)
+- **Amazon Cognito** — User Pool (email sign-up, email MFA recovery) + Identity Pool (temporary credentials for Transcribe and S3)
+- **Amazon API Gateway (REST)** — Cognito-authorised, CloudWatch access logs, CORS
+- **AWS Lambda (Python 3.13)** — five functions (see below)
+- **Amazon DynamoDB (on-demand)** — single `PersonasTable` with `personaID` partition key
+- **Amazon S3** — `RealEstateUploads` bucket; 14-day lifecycle, CORS, multipart abort after 1 day
+- **Amazon Bedrock** — Nova Lite (post-session analytics), Nova 2 Sonic (live Q&A), Bedrock Guardrails (content safety + PII)
+- **Bedrock AgentCore** — managed container runtime for the voice agent
+- **AWS Amplify Hosting** — static site hosting (manual zip deployment)
 
-- **Amazon API Gateway**: [INSERT_API_GATEWAY_DESCRIPTION - e.g., "Acts as the front door for all API requests"]
-  - [INSERT_API_GATEWAY_DETAILS]
+### Lambda Functions
 
-- **AWS Lambda**: Serverless compute for backend logic
-  - **[INSERT_LAMBDA_FUNCTION_1_NAME]**: [INSERT_LAMBDA_FUNCTION_1_DESCRIPTION]
-  - **[INSERT_LAMBDA_FUNCTION_2_NAME]**: [INSERT_LAMBDA_FUNCTION_2_DESCRIPTION]
-  - **[INSERT_LAMBDA_FUNCTION_3_NAME]**: [INSERT_LAMBDA_FUNCTION_3_DESCRIPTION]
+| Function | Runtime | Timeout | Purpose |
+|----------|---------|---------|---------|
+| `S3UrlLambda` | Python 3.13 | 20s | Generates pre-signed S3 URLs for all upload types (PDF, recording parts, JSON, manifest) |
+| `PersonaCrudLambda` | Python 3.13 | 20s | Full CRUD on DynamoDB personas table |
+| `PostMeetingAnalyticsLambda` | Python 3.13 | 120s | Reads session files from S3, invokes Bedrock Nova Lite for structured written feedback |
+| `ContentAnalysisLambda` | Python 3.13 | 120s | Analyses uploaded PDF content and generates persona-specific questions |
+| `AnamSessionTokenLambda` | Python 3.13 | 15s | Exchanges Anam API key for a short-lived session token |
 
-### AI/ML Services
-- **Amazon Bedrock**: [INSERT_BEDROCK_DESCRIPTION - e.g., "Foundation model service for AI capabilities"]
-  - Model: [INSERT_MODEL_NAME]
-  - [INSERT_BEDROCK_USAGE_DETAILS]
+### Bedrock Guardrail Configuration
+- **Input filters**: HATE (HIGH), SEXUAL (HIGH), PROMPT_ATTACK (HIGH)
+- **Output filters**: HATE (MEDIUM), SEXUAL (HIGH)
+- **PII anonymisation**: email, phone, address, name
+- **PII blocking**: credit card numbers, SSNs
 
-- **[INSERT_ADDITIONAL_AI_SERVICE]**: [INSERT_AI_SERVICE_DESCRIPTION]
+---
 
-### Data Storage
-- **Amazon S3**: [INSERT_S3_USAGE_DESCRIPTION - e.g., "Object storage for documents and media"]
-  - Bucket: [INSERT_BUCKET_PURPOSE]
+## Security Design
 
-- **Amazon DynamoDB**: [INSERT_DYNAMODB_DESCRIPTION - if applicable]
-  - Table: [INSERT_TABLE_PURPOSE]
-
-### Additional Services
-- **[INSERT_SERVICE_NAME]**: [INSERT_SERVICE_DESCRIPTION]
-- **[INSERT_SERVICE_NAME]**: [INSERT_SERVICE_DESCRIPTION]
+- **Authentication**: All API routes require a valid Cognito JWT (Cognito Authorizer on API Gateway)
+- **Authorisation**: Cognito Identity Pool issues scoped temporary credentials — authenticated users can only `transcribe:StartStreamTranscriptionWebSocket` and access their own S3 paths via pre-signed URLs
+- **Data isolation**: S3 keys are prefixed `{userId}/{sessionId}/` — the pre-signed URL Lambda validates the requesting user's identity before generating URLs
+- **Secrets**: `ANAM_API_KEY` is stored as a Lambda environment variable (not in source code). In production, migrate to AWS Secrets Manager
+- **Content safety**: All AI interactions (both written analytics and live voice Q&A) pass through Bedrock Guardrails. The voice agent uses a speculative transcript buffer to screen output before audio reaches the client
+- **Transport**: HTTPS enforced on Amplify, SSL enforced on S3 bucket, CloudWatch access logs on API Gateway
+- **cdk-nag**: AwsSolutionsChecks applied at synth time; all suppressions are documented with ADR-format reasons
 
 ---
 
 ## Infrastructure as Code
 
-This project uses **AWS CDK (Cloud Development Kit)** to define and deploy infrastructure.
-
-### CDK Stack Structure
-
 ```
 backend/
-├── bin/
-│   └── backend.ts          # CDK app entry point
+├── bin/backend.ts              # CDK app entry — instantiates all stacks
 ├── lib/
-│   └── backend-stack.ts    # Main stack definition
+│   ├── backend-stack.ts        # Core stack: Cognito, S3, DynamoDB, API GW, Lambdas, Guardrails
+│   ├── agentcore-stack.ts      # AgentCore runtime stack
+│   ├── amplify-stack.ts        # Amplify hosting stack
+│   └── frontend-config-stack.ts # Writes CDK outputs as Amplify env vars
 └── lambda/
-    └── [INSERT_LAMBDA_HANDLERS]
+    ├── s3-presigned-url-gen/
+    ├── persona-crud/
+    ├── post-meeting-analytics/
+    ├── content-analysis/
+    ├── anam-session-token/
+    └── layers/boto3-latest/     # Pinned boto3 layer for Bedrock structured output support
 ```
 
-### Key CDK Constructs
+---
 
-[INSERT_CDK_CONSTRUCTS_DESCRIPTION - Describe the main constructs used in the CDK stack]
+## Key Architectural Decisions
 
-1. **[INSERT_CONSTRUCT_1]**: [INSERT_CONSTRUCT_1_DESCRIPTION]
-2. **[INSERT_CONSTRUCT_2]**: [INSERT_CONSTRUCT_2_DESCRIPTION]
-3. **[INSERT_CONSTRUCT_3]**: [INSERT_CONSTRUCT_3_DESCRIPTION]
+### Decision 1: Client-Side Gaze Detection
 
-### Deployment Automation
+**Date**: 2026-05  
+**Status**: Accepted
 
-[INSERT_DEPLOYMENT_AUTOMATION_DESCRIPTION - Describe any CI/CD or automated deployment processes]
+**Context**: Eye contact tracking is a core delivery metric. Options were server-side frame analysis (high latency, cost), a third-party SDK, or in-browser ML.
+
+**Decision**: MediaPipe Face Landmarker runs entirely in the browser via WebAssembly.
+
+**Rationale**: Zero server cost, sub-30ms latency, no video frames leave the device (privacy), works offline. Accuracy is sufficient for the coaching use case (detecting sustained look-away, not precise gaze coordinates).
+
+**Tradeoff**: Initial WASM download (~8 MB), not available in environments without WebGL.
 
 ---
 
-## Security Considerations
+### Decision 2: Amazon Transcribe Streaming Over Web Speech API
 
-[INSERT_SECURITY_CONSIDERATIONS - Describe security measures implemented in the architecture]
+**Date**: 2026-05  
+**Status**: Accepted
 
-- **Authentication**: [INSERT_AUTH_DESCRIPTION]
-- **Authorization**: [INSERT_AUTHZ_DESCRIPTION]
-- **Data Encryption**: [INSERT_ENCRYPTION_DESCRIPTION]
-- **Network Security**: [INSERT_NETWORK_SECURITY_DESCRIPTION]
+**Context**: Filler word detection (`um`, `uh`, `like`) requires a transcription engine that does not suppress disfluencies. The browser Web Speech API (Google backend) filters them out.
 
----
+**Decision**: Stream raw PCM audio to Amazon Transcribe Streaming over a SigV4-signed WebSocket, using Cognito Identity Pool temporary credentials.
 
-## Scalability
+**Rationale**: Amazon Transcribe reliably captures disfluencies; Cognito credentials avoid exposing AWS keys in the browser; partial results arrive with ~300ms latency, enabling real-time display.
 
-[INSERT_SCALABILITY_DESCRIPTION - Describe how the architecture handles scaling]
-
-- **Auto-scaling**: [INSERT_AUTOSCALING_DETAILS]
-- **Load Balancing**: [INSERT_LOAD_BALANCING_DETAILS]
-- **Caching**: [INSERT_CACHING_DETAILS]
+**Tradeoff**: Requires Cognito Identity Pool setup; incurs per-minute Transcribe cost.
 
 ---
 
-## Architectural Decisions
+### Decision 3: Nova 2 Sonic via Bedrock AgentCore for Voice Q&A
 
-This section documents key architectural decisions made during the project's development. Each decision includes the context, alternatives considered, and rationale for the chosen approach.
+**Date**: 2026-06  
+**Status**: Accepted
 
-> **Note**: Use the [ADR Template](./ADR_TEMPLATE.md) when adding new decisions.
+**Context**: Live bidirectional voice Q&A with a persona requires a model that can handle interruption, turn-taking, and tool use simultaneously.
 
-### Decision 1: [INSERT_DECISION_TITLE]
+**Decision**: Use Amazon Nova 2 Sonic via the Strands `BidiAgent` abstraction, deployed on Bedrock AgentCore as a managed container.
 
-**Date**: [INSERT_DATE]  
-**Status**: Accepted | Superseded | Deprecated  
-**Deciders**: [INSERT_NAMES]
+**Rationale**: Nova 2 Sonic is a native multimodal model that handles audio input/output without a separate TTS/STT pipeline. AgentCore manages WebSocket lifecycle, session routing, and scaling. The `stop_conversation` tool gives the agent a clean way to end sessions.
 
-**Context**:  
-[INSERT_CONTEXT - What problem were we trying to solve? What constraints existed?]
-
-**Decision**:  
-[INSERT_DECISION - What did we decide to do?]
-
-**Alternatives Considered**:
-1. **[INSERT_ALTERNATIVE_1]**: [INSERT_WHY_NOT_CHOSEN]
-2. **[INSERT_ALTERNATIVE_2]**: [INSERT_WHY_NOT_CHOSEN]
-3. **[INSERT_ALTERNATIVE_3]**: [INSERT_WHY_NOT_CHOSEN]
-
-**Rationale**:  
-[INSERT_RATIONALE - Why did we choose this approach? What were the key factors?]
-
-**Consequences**:
-- **Positive**: [INSERT_BENEFITS]
-- **Negative**: [INSERT_TRADEOFFS]
-- **Neutral**: [INSERT_NEUTRAL_IMPACTS]
-
-**Related Decisions**: [INSERT_LINKS_TO_RELATED_DECISIONS]
+**Tradeoff**: AgentCore adds deployment complexity (Docker, ECR); Nova 2 Sonic is region-specific (us-east-1).
 
 ---
 
-### Decision 2: [INSERT_DECISION_TITLE]
+### Decision 4: Speculative Transcript Guardrail Gate
 
-[Repeat structure above for additional decisions]
+**Date**: 2026-06  
+**Status**: Accepted
+
+**Context**: Bedrock Guardrails can block AI-generated audio after it has already been sent to the client, creating an inconsistent user experience.
+
+**Decision**: Buffer audio chunks and screen the speculative transcript against the guardrail at sentence boundaries (or every 120 characters), releasing audio only after the screen passes.
+
+**Rationale**: Prevents objectionable audio from reaching the browser. The sentence-boundary trigger minimises added latency. Guardrail calls time out after 0.8s to avoid stalling the audio stream.
+
+**Tradeoff**: Adds 0–800ms latency per guardrail check; the timeout means the guardrail "fails open" under high latency conditions.
 
 ---
 
-### Example: Vector Search Implementation
+### Decision 5: Static Export + Manual Amplify Zip Deployment
 
-**Date**: 2024-01-15  
-**Status**: Accepted  
-**Deciders**: Jane Doe, John Smith
+**Date**: 2026-07  
+**Status**: Accepted
 
-**Context**:  
-The application requires semantic search capabilities over user-uploaded documents. We needed to choose a vector database solution that integrates well with AWS services, scales automatically, and minimizes operational overhead.
+**Context**: The frontend has no server-side rendering requirements. CI/CD via GitHub is not connected to this Amplify app.
 
-**Decision**:  
-Use Amazon OpenSearch Serverless with vector search capabilities instead of S3 with vector embeddings stored separately.
+**Decision**: `next build` with `output: 'export'` produces a static `out/` directory. Deployment is a manual zip upload via `aws amplify create-deployment` + `start-deployment`.
 
-**Alternatives Considered**:
-1. **S3 + DynamoDB for vectors**: Store embeddings in DynamoDB, documents in S3. Rejected due to query complexity and lack of native vector search optimization.
-2. **Amazon Kendra**: Provides semantic search but higher cost for our use case and less control over embedding models.
-3. **Self-managed OpenSearch on EC2**: Full control but requires operational overhead (patching, scaling, monitoring).
+**Rationale**: No server needed, lowest hosting cost, simple deployment script. Re-deployment takes under 2 minutes.
 
-**Rationale**:  
-- OpenSearch Serverless provides native vector search with k-NN algorithms
-- Automatic scaling eliminates capacity planning
-- Integrated with Bedrock for embeddings
-- Pay-per-use pricing aligns with PoC/prototype nature
-- No infrastructure management required
-
-**Consequences**:
-- **Positive**: Zero operational overhead, automatic scaling, optimized vector search performance
-- **Negative**: Vendor lock-in to AWS, cold start latency for infrequent queries, limited customization vs self-managed
-- **Neutral**: Learning curve for OpenSearch query syntax
-
-**Related Decisions**: Decision 3 (Bedrock Model Selection)
-
+**Tradeoff**: No incremental builds; every deploy re-uploads all static assets. Connect Amplify to GitHub for automatic deploys when the team is ready.
