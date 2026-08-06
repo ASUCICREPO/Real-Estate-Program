@@ -172,7 +172,8 @@ For complete API reference, see the [API Documentation](./docs/APIDoc.md).
 
 ## Credits
 
-This application was developed by the ASU Cloud Innovation Center (CIC) team.
+This application was developed by :
+- <a href="https://www.linkedin.com/in/sreeram-s-5454961aa/" target="_blank">Sreeram Saravana Prasad</a>
 
 ---
 
