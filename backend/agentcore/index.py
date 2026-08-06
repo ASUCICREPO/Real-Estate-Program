@@ -654,21 +654,28 @@ async def websocket_handler(websocket, context: RequestContext):
             except (asyncio.CancelledError, Exception):
                 pass
 
-        # Fallback analytics if not requested by client
-        if not ws_input._analytics_requested.is_set() and ws_output and ws_output.transcript_entries and not client_disconnected:
-            try:
-                feedback = await generate_qa_analytics(ws_output.transcript_entries, persona_data)
-                total_q = sum(1 for e in ws_output.transcript_entries if e['role'] == 'assistant')
-                total_r = sum(1 for e in ws_output.transcript_entries if e['role'] == 'user')
-                await websocket.send_json({
-                    "type": "qa_analytics",
-                    "qaFeedback": feedback,
-                    "totalQuestions": total_q,
-                    "totalResponses": total_r,
-                })
-                await save_qa_analytics(user_id, session_id, ws_output.transcript_entries, feedback)
-            except Exception:
-                pass
+        # Save analytics to S3 regardless of how session ended
+        # (timer expiry, client disconnect, or normal completion)
+        if ws_output and ws_output.transcript_entries:
+            if not ws_input._analytics_requested.is_set():
+                try:
+                    feedback = await generate_qa_analytics(ws_output.transcript_entries, persona_data)
+                    total_q = sum(1 for e in ws_output.transcript_entries if e['role'] == 'assistant')
+                    total_r = sum(1 for e in ws_output.transcript_entries if e['role'] == 'user')
+                    # Always save to S3 first — WebSocket send is best-effort only
+                    await save_qa_analytics(user_id, session_id, ws_output.transcript_entries, feedback)
+                    if not client_disconnected:
+                        try:
+                            await websocket.send_json({
+                                "type": "qa_analytics",
+                                "qaFeedback": feedback,
+                                "totalQuestions": total_q,
+                                "totalResponses": total_r,
+                            })
+                        except Exception:
+                            pass  # WebSocket may already be closed after timer expiry
+                except Exception as e:
+                    print(f"[WebSocket] Fallback analytics error: {e}", flush=True)
 
     except Exception as e:
         print(f"[WebSocket] Handler error: {e}", flush=True)
