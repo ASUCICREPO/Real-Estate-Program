@@ -1,182 +1,267 @@
-# Project Modification Guide
+# Modification Guide — W. P. Carey Real Estate Program AI Presentation Coach
 
-This guide is for developers who want to extend, customize, or modify [INSERT_PROJECT_NAME].
-
----
-
-## Introduction
-
-This document provides guidance on how to modify and extend [INSERT_PROJECT_NAME]. Whether you want to add new features, change existing behavior, or customize the application for your needs, this guide will help you understand the codebase and make changes effectively.
+This guide is for developers who want to extend, customize, or adapt the platform.
 
 ---
 
-## Table of Contents
-
-- [Project Structure Overview](#project-structure-overview)
-- [Frontend Modifications](#frontend-modifications)
-- [Backend Modifications](#backend-modifications)
-- [Adding New Features](#adding-new-features)
-- [Changing AI/ML Models](#changing-aiml-models)
-- [Database Modifications](#database-modifications)
-- [Best Practices](#best-practices)
-
----
-
-## Project Structure Overview
+## Project Structure
 
 ```
 ├── backend/
-│   ├── bin/backend.ts         # CDK app entry point
-│   ├── lib/backend-stack.ts   # Infrastructure definitions
-│   ├── lambda/                # Lambda function handlers
-│   └── agent/                 # Agent configurations
+│   ├── bin/backend.ts                  # CDK app entry — instantiates all stacks
+│   ├── lib/
+│   │   ├── backend-stack.ts            # Core infrastructure (Cognito, S3, DynamoDB, API GW, Lambdas, Guardrails)
+│   │   ├── agentcore-stack.ts          # Bedrock AgentCore voice agent runtime
+│   │   ├── amplify-hosting-stack.ts    # Amplify app + optional GitHub source
+│   │   └── frontend-config-stack.ts   # Injects CDK outputs as Amplify env vars
+│   ├── lambda/
+│   │   ├── s3-presigned-url-gen/       # Pre-signed URL generator
+│   │   ├── persona-crud/               # Persona CRUD (DynamoDB)
+│   │   ├── post-meeting-analytics/     # AI feedback via Bedrock Nova Lite
+│   │   ├── content-analysis/           # PDF content analysis + question generation
+│   │   ├── anam-session-token/         # Anam AI avatar session token exchange
+│   │   └── layers/boto3-latest/        # Shared boto3 Lambda layer
+│   └── agentcore/
+│       ├── index.py                    # Voice agent (Nova 2 Sonic via Strands BidiAgent)
+│       ├── qa_system_prompt.jinja2     # Persona Q&A system prompt template
+│       ├── Dockerfile                  # Container image for AgentCore runtime
+│       └── requirements.txt
 ├── frontend/
-│   ├── app/                   # Next.js pages and components
-│   └── public/                # Static assets
-└── docs/                      # Documentation
+│   ├── app/
+│   │   ├── components/                 # React UI components
+│   │   │   └── practice/               # Practice session sub-components
+│   │   ├── hooks/                      # Custom hooks (audio, video, gaze, analytics)
+│   │   ├── services/
+│   │   │   ├── api.ts                  # REST API service layer
+│   │   │   └── websocket.ts            # AgentCore WebSocket client
+│   │   └── config/config.ts            # Centralized configuration and constants
+│   └── public/
+├── deploy.sh                           # One-command CloudShell deployment script
+├── buildspec-deploy.yml                # CodeBuild deployment spec
+└── docs/
 ```
 
 ---
 
-## Frontend Modifications
+## Common Modifications
 
-### Changing the UI Theme
+### Add or Modify a Persona
 
-**Location**: `frontend/app/globals.css`
+Personas live in DynamoDB and are managed through the app's Admin panel (sign in as Admin → Personas). No code change needed.
 
-[INSERT_THEME_MODIFICATION_INSTRUCTIONS]
-
-### Adding New Pages
-
-**Location**: `frontend/app/`
-
-1. Create a new directory for your page
-2. Add a `page.tsx` file
-3. [INSERT_ADDITIONAL_STEPS]
-
-### Modifying Components
-
-**Location**: `frontend/app/components/` (if exists)
-
-[INSERT_COMPONENT_MODIFICATION_INSTRUCTIONS]
+To change what fields a persona can have, update the `Persona` interface in `frontend/app/config/config.ts` and the DynamoDB read/write logic in `backend/lambda/persona-crud/index.py`.
 
 ---
 
-## Backend Modifications
+### Change Delivery Metric Targets
 
-### Adding New Lambda Functions
+Default best-practice thresholds are in `frontend/app/config/config.ts`:
 
-**Location**: `backend/lambda/`
-
-1. Create a new file in the `lambda/` directory
-2. Implement your handler function
-3. Add the Lambda to the CDK stack in `backend/lib/backend-stack.ts`
-
-**Example**:
 ```typescript
-// backend/lambda/newFunction.ts
-export const handler = async (event: any) => {
-  // Your logic here
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: 'Success' })
-  };
+export const DEFAULT_BEST_PRACTICES: PersonaBestPractices = {
+  wpm: { min: 140, max: 160 },
+  eyeContact: { min: 60 },
+  fillerWords: { max: 3 },
+  pauses: { min: 4 },
 };
 ```
 
-### Modifying the CDK Stack
-
-**Location**: `backend/lib/backend-stack.ts`
-
-[INSERT_CDK_MODIFICATION_INSTRUCTIONS]
-
-### Adding New API Endpoints
-
-1. Define the Lambda function
-2. Add API Gateway integration in the stack
-3. Update API documentation
+Per-persona overrides are stored in each persona's DynamoDB record under `bestPractices`. The frontend merges them: `DEFAULT_BEST_PRACTICES ← persona.bestPractices ← per-session override`.
 
 ---
 
-## Adding New Features
+### Add a New Filler Word
 
-### Feature: [INSERT_FEATURE_NAME]
+Edit `FILLER_WORDS` in `frontend/app/config/config.ts`:
 
-**Files to modify**:
-- [INSERT_FILE_1]
-- [INSERT_FILE_2]
-
-**Steps**:
-1. [INSERT_STEP_1]
-2. [INSERT_STEP_2]
-3. [INSERT_STEP_3]
+```typescript
+FILLER_WORDS: ['um', 'uh', 'like', 'actually', 'you know', 'basically', 'so', 'right', 'well'],
+```
 
 ---
 
-## Changing AI/ML Models
+### Modify the AI Feedback Prompt
 
-### Switching Bedrock Models
+The post-session analytics prompt is built in `backend/lambda/post-meeting-analytics/index.py`. Look for the `build_analysis_prompt()` function and adjust the persona framing, scoring criteria, or output schema as needed.
 
-**Location**: [INSERT_MODEL_CONFIG_LOCATION]
-
-[INSERT_MODEL_CHANGE_INSTRUCTIONS]
-
-### Modifying Prompts
-
-**Location**: [INSERT_PROMPT_LOCATION]
-
-[INSERT_PROMPT_MODIFICATION_INSTRUCTIONS]
+The Bedrock model is configured via the `QA_ANALYTICS_MODEL_ID` Lambda environment variable (default: `global.amazon.nova-2-lite-v1:0`). Change it to any model ID supported by your account.
 
 ---
 
-## Database Modifications
+### Modify the Voice Q&A System Prompt
 
-### Adding New Tables
+Edit `backend/agentcore/qa_system_prompt.jinja2`. The template receives:
+- `persona_name` — the persona's display name
+- `persona_prompt` — the persona's coaching prompt from DynamoDB
+- `custom_instructions` — student-provided custom notes
+- `transcript_text` — the presentation transcript
+- `qa_limit` — Q&A duration in minutes
 
-[INSERT_DATABASE_MODIFICATION_INSTRUCTIONS]
-
-### Modifying Schema
-
-[INSERT_SCHEMA_MODIFICATION_INSTRUCTIONS]
-
----
-
-## Best Practices
-
-1. **Test locally before deploying** - Use `cdk synth` to validate changes
-2. **Use environment variables** - Don't hardcode sensitive values
-3. **Follow existing patterns** - Maintain consistency with the codebase
-4. **Update documentation** - Keep docs in sync with code changes
-5. **Version control** - Make small, focused commits
-
----
-
-## Testing Your Changes
-
-### Local Testing
+After editing, redeploy the AgentCore container:
 
 ```bash
-# Frontend
+cd backend
+cdk deploy AgentCoreStack-main -c branchName=main
+```
+
+---
+
+### Change the Q&A Voice
+
+Each persona record in DynamoDB has a `voiceId` field. Valid values:
+`matthew`, `tiffany`, `amy`, `ambre`, `florian`, `beatrice`, `lorenzo`, `greta`, `lennart`, `lupe`, `carlos`
+
+Update the persona's `voiceId` via the Admin panel. No deployment needed.
+
+---
+
+### Add a New Lambda Endpoint
+
+1. Create `backend/lambda/<your-function>/index.py`
+2. Add the Lambda and API Gateway route in `backend/lib/backend-stack.ts`:
+
+```typescript
+const myLambda = new lambda.Function(this, 'MyLambda', {
+  runtime: lambda.Runtime.PYTHON_3_13,
+  handler: 'index.lambda_handler',
+  code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda', 'my-function')),
+  timeout: cdk.Duration.seconds(30),
+  environment: { 'UPLOADS_BUCKET': uploadsBucket.bucketName },
+});
+
+const myResource = api.root.addResource('my-endpoint');
+myResource.addMethod('POST', new apigateway.LambdaIntegration(myLambda), {
+  authorizer,
+  authorizationType: apigateway.AuthorizationType.COGNITO,
+});
+```
+
+3. Add the corresponding API call in `frontend/app/services/api.ts`
+4. Redeploy: `cdk deploy RealEstateProgramStack-main -c branchName=main`
+
+---
+
+### Modify the Practice Session Layout
+
+The main recording view is in `frontend/app/components/PracticeSession.tsx`. Sub-components are in `frontend/app/components/practice/`:
+
+| Component | Purpose |
+|-----------|---------|
+| `PracticeSessionHeader.tsx` | Header with back button and timer |
+| `CompactMetricsBar.tsx` | Horizontal delivery metrics cards at the top |
+| `CameraView.tsx` | Webcam feed, recording badge, and controls |
+| `PdfViewer.tsx` | PDF iframe with toolbar suppressed |
+| `PdfPlaceholder.tsx` | Empty state when no PDF is uploaded |
+| `CalibrationPanel.tsx` | Face mesh + gaze calibration step |
+| `MicCheckCard.tsx` | Microphone level check |
+| `RealTimeFeedbackPanel.tsx` | Sidebar metrics panel (used in older layout) |
+| `TranscriptionPanel.tsx` | Live transcript display |
+
+The current layout uses a **40/60 grid split**: camera on the left (`lg:col-span-2`) and PDF on the right (`lg:col-span-3`) within a `lg:grid-cols-5` grid.
+
+---
+
+### Change the Transcription Provider
+
+Edit `TRANSCRIPTION.PROVIDER` in `frontend/app/config/config.ts`:
+
+```typescript
+PROVIDER: 'aws-transcribe' as 'web-speech' | 'aws-transcribe',
+```
+
+- `'aws-transcribe'` — Amazon Transcribe Streaming (recommended; captures filler words)
+- `'web-speech'` — Browser Web Speech API (free but suppresses disfluencies like "um")
+
+---
+
+### Adjust Video Recording Chunk Size
+
+Video is uploaded in 90-second multipart chunks. Change `CHUNK_INTERVAL_MS` in `frontend/app/config/config.ts`:
+
+```typescript
+CHUNK_INTERVAL_MS: 90_000,  // 90 seconds per chunk
+```
+
+S3 requires a minimum 5 MB per multipart part (except the last). At 640×480 at ~500 kbps, 90 seconds produces ~5.6 MB — safe margin. Don't go below 60 seconds.
+
+---
+
+### Update Bedrock Guardrail Filters
+
+Edit the `ContentGuardrail` resource in `backend/lib/backend-stack.ts`. Current filters:
+
+```typescript
+contentPolicyConfig: {
+  filtersConfig: [
+    { type: 'HATE', inputStrength: 'HIGH', outputStrength: 'MEDIUM' },
+    { type: 'SEXUAL', inputStrength: 'HIGH', outputStrength: 'HIGH' },
+    { type: 'PROMPT_ATTACK', inputStrength: 'HIGH', outputStrength: 'NONE' },
+    // ...
+  ],
+},
+```
+
+After changing, redeploy the backend stack: `cdk deploy RealEstateProgramStack-main -c branchName=main`.
+
+---
+
+### Add GitHub Actions CI/CD
+
+The `deploy.sh` script supports GitHub mode — Amplify auto-builds on every push to `main`:
+
+```bash
+bash deploy.sh
+# When prompted for GitHub token, provide a PAT with repo + admin:repo_hook scopes
+```
+
+Alternatively, pass context flags directly:
+
+```bash
+cdk deploy --all -c branchName=main \
+  -c githubOwner=ASUCICREPO \
+  -c githubRepo=Real-Estate-Program \
+  -c githubToken=<pat>
+```
+
+---
+
+### Local Development
+
+```bash
+# Backend — synthesize CDK to check for errors
+cd backend && npm install && cdk synth -c branchName=main
+
+# Frontend — run dev server against deployed backend
 cd frontend
-npm run dev
-
-# Backend (synthesize CDK)
-cd backend
-cdk synth
-```
-
-### Deployment Testing
-
-```bash
-cd backend
-cdk deploy --hotswap  # For faster Lambda updates
+# Create .env.local with your deployed stack values (see deploymentGuide.md)
+npm install && npm run dev
+# App runs at http://localhost:3000
 ```
 
 ---
 
-## Conclusion
+## Deployment After Changes
 
-This project is designed to be extensible. We encourage developers to modify and improve the system to better serve their needs. If you create useful extensions, consider contributing back to the project.
+**Frontend only** — no CDK needed:
+```bash
+cd frontend && npm run build
+cd out && zip -r ../../deploy.zip . && cd ../..
+# Then run the Amplify create-deployment + start-deployment commands from deploymentGuide.md
+```
 
-For questions or support, please [INSERT_SUPPORT_INSTRUCTIONS].
+**Backend changes:**
+```bash
+cd backend
+cdk deploy RealEstateProgramStack-main -c branchName=main  # API, Lambdas, auth
+# or
+cdk deploy AgentCoreStack-main -c branchName=main           # Voice agent only
+# or
+cdk deploy --all -c branchName=main                         # Everything
+```
 
+**AgentCore code changes** (index.py, qa_system_prompt.jinja2, Dockerfile):
+```bash
+cd backend
+cdk deploy AgentCoreStack-main -c branchName=main
+# CDK rebuilds and pushes the Docker image, then updates the runtime
+```

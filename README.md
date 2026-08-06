@@ -64,11 +64,13 @@ For a detailed explanation, see the [Architecture Deep Dive](./docs/architecture
 
 For complete deployment instructions, see the [Deployment Guide](./docs/deploymentGuide.md).
 
-**Quick Start:**
-1. Configure AWS credentials and environment variables
-2. `cd backend && npm install && ANAM_API_KEY=<key> cdk deploy --all`
-3. Copy CDK outputs into `frontend/.env.local`
-4. `cd frontend && npm run build` then deploy the `out/` folder to Amplify
+**Quick Start (CloudShell — no local tooling needed):**
+```bash
+git clone https://github.com/ASUCICREPO/Real-Estate-Program.git
+cd Real-Estate-Program
+bash deploy.sh
+```
+Follow the prompts (repo, branch, Anam API key, optional GitHub token). CodeBuild handles the rest — ~15 minutes.
 
 ---
 

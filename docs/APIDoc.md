@@ -1,196 +1,379 @@
-# [INSERT_PROJECT_NAME] APIs
-
-This document provides comprehensive API documentation for [INSERT_PROJECT_NAME].
+# API Documentation — W. P. Carey Real Estate Program AI Presentation Coach
 
 ---
 
 ## Overview
 
-[INSERT_API_OVERVIEW - Brief description of what the APIs do and their purpose]
+The backend exposes a REST API through Amazon API Gateway and a WebSocket endpoint through Bedrock AgentCore. All REST routes require a valid Amazon Cognito JWT passed in the `Authorization` header.
 
 ---
 
 ## Base URL
 
 ```
-https://[INSERT_API_ID].execute-api.[INSERT_REGION].amazonaws.com/[INSERT_STAGE]/
+https://<api-id>.execute-api.us-east-1.amazonaws.com/prod/
 ```
 
-> **[PLACEHOLDER]** Replace with your actual API Gateway endpoint after deployment
-
-**Example:**
-```
-https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/
-```
+Found in CDK outputs as `RealEstateProgramStack-main.ApiUrl`.
 
 ---
 
 ## Authentication
 
-[INSERT_AUTHENTICATION_METHOD - Describe how API requests should be authenticated]
+All REST endpoints use **Cognito User Pool authorization**. Include the ID token from Cognito in every request:
 
-### Headers Required
-| Header | Description | Required |
-|--------|-------------|----------|
-| `[INSERT_HEADER_1]` | [INSERT_DESCRIPTION] | Yes/No |
-| `[INSERT_HEADER_2]` | [INSERT_DESCRIPTION] | Yes/No |
-| `Content-Type` | `application/json` | Yes |
+```
+Authorization: <CognitoIdToken>
+```
+
+Obtain the token via the Amplify Auth SDK:
+
+```typescript
+import { fetchAuthSession } from 'aws-amplify/auth';
+
+const session = await fetchAuthSession();
+const token = session.tokens?.idToken?.toString();
+```
+
+The WebSocket endpoint uses **IAM SigV4 signing** with credentials from the Cognito Identity Pool.
 
 ---
 
-## 1) [INSERT_API_GROUP_1_NAME - e.g., "Chat Endpoints"]
-
-[INSERT_GROUP_DESCRIPTION - Brief description of this group of endpoints]
+## REST Endpoints
 
 ---
 
-#### POST /[INSERT_ENDPOINT_1] — [INSERT_BRIEF_DESCRIPTION]
+### S3 Pre-signed URLs
 
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
+#### `GET /s3_urls` — Get download URL
 
-- **Request body**:
-```json
-{
-  "[INSERT_FIELD_1]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]",
-  "[INSERT_FIELD_2]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]",
-  "[INSERT_FIELD_3]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
-}
-```
+Returns a pre-signed GET URL to read a session file from S3.
 
-- **Example request**:
-```json
-{
-  "[INSERT_FIELD_1]": "[INSERT_EXAMPLE_VALUE]",
-  "[INSERT_FIELD_2]": "[INSERT_EXAMPLE_VALUE]"
-}
-```
+**Query parameters:**
 
-- **Response**:
-```json
-{
-  "[INSERT_RESPONSE_FIELD_1]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]",
-  "[INSERT_RESPONSE_FIELD_2]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
-}
-```
-
-- **Example response**:
-```json
-{
-  "[INSERT_RESPONSE_FIELD_1]": "[INSERT_EXAMPLE_VALUE]",
-  "[INSERT_RESPONSE_FIELD_2]": "[INSERT_EXAMPLE_VALUE]"
-}
-```
-
-- **Status codes**:
-  - `200 OK` - [INSERT_SUCCESS_DESCRIPTION]
-  - `400 Bad Request` - [INSERT_ERROR_DESCRIPTION]
-  - `500 Internal Server Error` - [INSERT_ERROR_DESCRIPTION]
-
----
-
-#### GET /[INSERT_ENDPOINT_2] — [INSERT_BRIEF_DESCRIPTION]
-
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
-
-- **Query parameters**:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `[INSERT_PARAM_1]` | [INSERT_TYPE] | Yes/No | [INSERT_DESCRIPTION] |
-| `[INSERT_PARAM_2]` | [INSERT_TYPE] | Yes/No | [INSERT_DESCRIPTION] |
+| `sessionId` | string | Yes | Session identifier (e.g. `session_1234567890`) |
+| `type` | string | Yes | File type: `session`, `transcript`, `session_analytics`, `detailed_metrics`, `manifest` |
 
-- **Example request**:
-```
-GET /[INSERT_ENDPOINT]?[INSERT_PARAM_1]=[INSERT_VALUE]&[INSERT_PARAM_2]=[INSERT_VALUE]
-```
-
-- **Response**:
+**Response:**
 ```json
 {
-  "[INSERT_RESPONSE_FIELD]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
+  "url": "https://s3.amazonaws.com/bucket/path?X-Amz-..."
 }
 ```
 
 ---
 
-## 2) [INSERT_API_GROUP_2_NAME - e.g., "Document Endpoints"]
+#### `POST /s3_urls` — Get upload URL(s)
 
-[INSERT_GROUP_DESCRIPTION]
+Returns pre-signed PUT URLs for uploading session files.
 
----
-
-#### POST /[INSERT_ENDPOINT_3] — [INSERT_BRIEF_DESCRIPTION]
-
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
-
-- **Request body**:
+**Request body:**
 ```json
 {
-  "[INSERT_FIELD]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
+  "sessionId": "session_1234567890",
+  "type": "ppt | session | metric_chunk | persona_customization | transcript | session_analytics | detailed_metrics | manifest",
+  "partNumber": 1,
+  "uploadId": "abc123"
 }
 ```
 
-- **Response**:
+- `type: "ppt"` — returns a URL to upload a PDF presentation
+- `type: "session"` — initiates or continues a multipart video upload; requires `partNumber` and `uploadId`
+- `type: "manifest"` — returns a URL to write the session coordination manifest
+
+**Response (single file upload):**
 ```json
 {
-  "[INSERT_RESPONSE_FIELD]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
+  "url": "https://s3.amazonaws.com/bucket/path?X-Amz-..."
 }
 ```
 
----
-
-#### DELETE /[INSERT_ENDPOINT_4] — [INSERT_BRIEF_DESCRIPTION]
-
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
-
-- **Path parameters**:
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `[INSERT_PARAM]` | [INSERT_TYPE] | [INSERT_DESCRIPTION] |
-
-- **Response**:
+**Response (multipart initiation):**
 ```json
 {
-  "message": "string - Success/error message"
+  "uploadId": "abc123",
+  "url": "https://s3.amazonaws.com/bucket/path?partNumber=1&uploadId=abc123&X-Amz-..."
 }
 ```
 
 ---
 
-## 3) [INSERT_API_GROUP_3_NAME - e.g., "Admin Endpoints"]
+### Personas
 
-[INSERT_GROUP_DESCRIPTION]
+#### `GET /personas` — List all personas
 
----
+Returns all persona records from DynamoDB.
 
-#### [INSERT_HTTP_METHOD] /[INSERT_ENDPOINT] — [INSERT_BRIEF_DESCRIPTION]
-
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
-
-- **Request/Response**: [INSERT_DETAILS]
-
----
-
-## Response Format
-
-All API responses follow this general structure:
-
-### Success Response
+**Response:**
 ```json
 {
-  "statusCode": 200,
-  "body": {
-    "[INSERT_DATA_FIELD]": "[INSERT_DATA]"
+  "items": [
+    {
+      "personaID": "uuid",
+      "name": "Commercial Lender",
+      "description": "...",
+      "personaPrompt": "...",
+      "expertise": "intermediate",
+      "keyPriorities": ["debt service coverage", "loan-to-value ratio"],
+      "presentationTime": "15 minutes",
+      "communicationStyle": "analytical",
+      "timeLimitSec": 900,
+      "qaTimeLimitSec": 300,
+      "voiceId": "matthew",
+      "anamPersonaId": "26981553-4601-4799-b64b-7dfa1580de8c",
+      "bestPractices": {
+        "wpm": { "min": 130, "max": 160 },
+        "eyeContact": { "min": 65 },
+        "fillerWords": { "max": 3 },
+        "pauses": { "min": 4 }
+      }
+    }
+  ],
+  "nextToken": null
+}
+```
+
+---
+
+#### `POST /personas` — Create a persona
+
+**Request body:**
+```json
+{
+  "name": "Commercial Lender",
+  "description": "...",
+  "personaPrompt": "You are a commercial lender evaluating...",
+  "expertise": "intermediate",
+  "keyPriorities": ["debt service coverage", "loan-to-value ratio"],
+  "presentationTime": "15 minutes",
+  "communicationStyle": "analytical",
+  "timeLimitSec": 900,
+  "qaTimeLimitSec": 300,
+  "voiceId": "matthew",
+  "anamPersonaId": "26981553-4601-4799-b64b-7dfa1580de8c",
+  "icon": "briefcase",
+  "bestPractices": {
+    "wpm": { "min": 130, "max": 160 },
+    "eyeContact": { "min": 65 },
+    "fillerWords": { "max": 3 },
+    "pauses": { "min": 4 }
+  },
+  "scoringWeights": {
+    "pace": 0.25,
+    "eyeContact": 0.30,
+    "fillerWords": 0.20,
+    "pauses": 0.25
   }
 }
 ```
 
-### Error Response
+**Response:** `201 Created` with the created persona object including the generated `personaID`.
+
+---
+
+#### `GET /personas/{personaID}` — Get a single persona
+
+**Response:** Single persona object (same shape as items above).
+
+---
+
+#### `PUT /personas/{personaID}` — Update a persona
+
+**Request body:** Any subset of the persona fields to update.
+
+**Response:** Updated persona object.
+
+---
+
+#### `DELETE /personas/{personaID}` — Delete a persona
+
+**Response:**
+```json
+{ "message": "Persona deleted successfully" }
+```
+
+---
+
+### Analytics
+
+#### `GET /analytics` — Get post-session AI feedback
+
+Polls for AI analysis results. The analysis Lambda runs asynchronously after the manifest is completed; this endpoint returns the results once ready.
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `sessionId` | string | Yes | Session identifier |
+
+**Response (ready):**
 ```json
 {
-  "statusCode": "[INSERT_ERROR_CODE]",
-  "error": {
-    "message": "[INSERT_ERROR_MESSAGE]",
-    "code": "[INSERT_ERROR_CODE_STRING]"
+  "status": "completed",
+  "sessionId": "session_1234567890",
+  "overallScore": 78,
+  "deliverySummary": "...",
+  "strengths": ["Strong eye contact throughout", "Well-paced delivery"],
+  "improvements": ["Reduce filler words", "Add more strategic pauses"],
+  "personaFeedback": "From a commercial lender's perspective...",
+  "metricBreakdown": {
+    "pace": { "score": 82, "average": 145, "target": "130-160 wpm" },
+    "eyeContact": { "score": 90, "percentage": 78, "target": "≥65%" },
+    "fillerWords": { "score": 65, "count": 12, "target": "≤3 per 30s" },
+    "pauses": { "score": 70, "count": 18, "target": "≥4 per 30s" }
+  }
+}
+```
+
+**Response (processing):**
+```json
+{ "status": "processing" }
+```
+
+The frontend polls this endpoint every 3 seconds until `status` is `"completed"`.
+
+---
+
+### Content Analysis
+
+#### `POST /content` — Analyse uploaded PDF
+
+Triggers content analysis of an uploaded PDF and generates persona-specific questions.
+
+**Request body:**
+```json
+{
+  "sessionId": "session_1234567890",
+  "personaId": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "summary": "The presentation covers a mixed-use development in Tempe...",
+  "questions": [
+    "What is the projected debt service coverage ratio in year 1?",
+    "How does the proposed LTV compare to current market standards?"
+  ]
+}
+```
+
+---
+
+### Anam Session Token
+
+#### `POST /anam-session` — Get Anam AI avatar session token
+
+Exchanges the backend Anam API key for a short-lived client session token used to initialize the Anam avatar.
+
+**Request body:**
+```json
+{
+  "anamPersonaId": "26981553-4601-4799-b64b-7dfa1580de8c"
+}
+```
+
+**Response:**
+```json
+{
+  "sessionToken": "eyJ..."
+}
+```
+
+**Error responses:**
+- `400` — missing `anamPersonaId`
+- `500` — `ANAM_API_KEY` not configured on the Lambda
+- `502` — Anam API returned an error (check API key validity)
+
+---
+
+## WebSocket — Live Voice Q&A
+
+The WebSocket endpoint connects to the Bedrock AgentCore runtime for bidirectional voice streaming.
+
+**URL:** `wss://bedrock-agentcore.<region>.amazonaws.com/runtimes/<runtime-arn>/ws`
+
+Found in CDK outputs as `AgentCoreStack-main.AgentCoreWebSocketUrl`.
+
+**Auth:** IAM SigV4 signed WebSocket connection using Cognito Identity Pool credentials.
+
+---
+
+### Connection Flow
+
+**1. Client connects** (SigV4 signed WebSocket URL)
+
+**2. Client sends setup frame:**
+```json
+{
+  "action": "setup",
+  "personaId": "uuid",
+  "userId": "cognito-sub-uuid",
+  "sessionId": "session_1234567890",
+  "voiceId": "matthew",
+  "qaTimeLimitSec": 300,
+  "previousContext": "optional: Q&A summary from prior persona sessions"
+}
+```
+
+**3. Server responds with session_started:**
+```json
+{
+  "type": "session_started",
+  "persona_name": "Commercial Lender",
+  "session_id": "session_1234567890"
+}
+```
+
+---
+
+### Client → Server Messages
+
+| Action | Description |
+|--------|-------------|
+| `{"action": "audio", "data": "<base64-pcm>"}` | Send raw PCM audio chunk (16 kHz, mono, 16-bit) |
+| `{"action": "get_analytics"}` | Request Q&A analytics generation |
+| `{"action": "end"}` | End the session gracefully |
+
+---
+
+### Server → Client Messages
+
+| Type | Description |
+|------|-------------|
+| `{"type": "audio", "data": "<base64-pcm>"}` | PCM audio from the persona (16 kHz, mono) |
+| `{"type": "audio_clear"}` | Clear buffered audio (guardrail intervention) |
+| `{"type": "transcript", "role": "user\|assistant", "text": "...", "is_partial": true\|false}` | Transcript segment |
+| `{"type": "interruption"}` | User interrupted the persona |
+| `{"type": "guardrail_intervention", "sanitized_text": "..."}` | Content blocked by guardrails |
+| `{"type": "qa_analytics", "qaFeedback": {...}, "totalQuestions": N, "totalResponses": N}` | Q&A session analytics |
+| `{"type": "session_ended", "reason": "server_complete"}` | Session finished |
+| `{"type": "error", "message": "..."}` | Setup or runtime error |
+
+---
+
+### Q&A Analytics Response Shape
+
+```json
+{
+  "type": "qa_analytics",
+  "totalQuestions": 4,
+  "totalResponses": 4,
+  "qaFeedback": {
+    "overallSummary": "The presenter demonstrated solid knowledge...",
+    "responseQuality": "Good",
+    "strengths": ["Direct answers", "Used specific numbers"],
+    "improvements": ["Acknowledge risk more proactively"],
+    "questionBreakdown": [
+      {
+        "question": "What is your projected DSCR in year 1?",
+        "rating": "Strong",
+        "note": "Answered with specific figure and explained assumptions"
+      }
+    ]
   }
 }
 ```
@@ -199,88 +382,31 @@ All API responses follow this general structure:
 
 ## Error Codes
 
-| Code | Name | Description |
-|------|------|-------------|
-| `400` | Bad Request | [INSERT_DESCRIPTION] |
-| `401` | Unauthorized | [INSERT_DESCRIPTION] |
-| `403` | Forbidden | [INSERT_DESCRIPTION] |
-| `404` | Not Found | [INSERT_DESCRIPTION] |
-| `429` | Too Many Requests | [INSERT_DESCRIPTION] |
-| `500` | Internal Server Error | [INSERT_DESCRIPTION] |
+| HTTP Code | Meaning |
+|-----------|---------|
+| `400` | Bad request — missing or invalid parameters |
+| `401` | Unauthorized — missing or expired Cognito token |
+| `403` | Forbidden — valid token but insufficient permissions |
+| `404` | Not found — session or persona doesn't exist |
+| `500` | Internal server error — check CloudWatch logs |
+| `502` | Bad gateway — upstream service (Anam, Bedrock) returned an error |
 
 ---
 
-## Rate Limiting
+## S3 Object Paths
 
-[INSERT_RATE_LIMITING_DETAILS - Describe any rate limits on the API]
+All session files are stored under `{userId}/{sessionId}/`:
 
-- **Requests per second**: [INSERT_LIMIT]
-- **Requests per day**: [INSERT_LIMIT]
-- **Burst limit**: [INSERT_LIMIT]
+| File | Description |
+|------|-------------|
+| `presentation.pdf` | Uploaded PDF slides |
+| `recording.webm` | Multipart video recording |
+| `transcript.json` | Full presentation transcript |
+| `session_analytics.json` | Per-second delivery metrics summary |
+| `detailed_metrics.json` | Per-second metric snapshots |
+| `manifest.json` | Session coordination metadata |
+| `CUSTOM_PERSONA_INSTRUCTION.txt` | Custom persona notes |
+| `qa_transcript.json` | Q&A session transcript |
+| `qa_analytics.json` | Q&A session AI feedback |
 
----
-
-## SDK / Client Examples
-
-### JavaScript/TypeScript
-```typescript
-// [INSERT_EXAMPLE_CODE]
-const response = await fetch('[INSERT_API_URL]/[INSERT_ENDPOINT]', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    '[INSERT_AUTH_HEADER]': '[INSERT_AUTH_VALUE]'
-  },
-  body: JSON.stringify({
-    [INSERT_REQUEST_BODY]
-  })
-});
-
-const data = await response.json();
-```
-
-### Python
-```python
-# [INSERT_EXAMPLE_CODE]
-import requests
-
-response = requests.post(
-    '[INSERT_API_URL]/[INSERT_ENDPOINT]',
-    headers={
-        'Content-Type': 'application/json',
-        '[INSERT_AUTH_HEADER]': '[INSERT_AUTH_VALUE]'
-    },
-    json={
-        '[INSERT_FIELD]': '[INSERT_VALUE]'
-    }
-)
-
-data = response.json()
-```
-
-### cURL
-```bash
-curl -X POST '[INSERT_API_URL]/[INSERT_ENDPOINT]' \
-  -H 'Content-Type: application/json' \
-  -H '[INSERT_AUTH_HEADER]: [INSERT_AUTH_VALUE]' \
-  -d '{
-    "[INSERT_FIELD]": "[INSERT_VALUE]"
-  }'
-```
-
----
-
-## Changelog
-
-| Version | Date | Changes |
-|---------|------|---------|
-| [INSERT_VERSION] | [INSERT_DATE] | [INSERT_CHANGES] |
-
----
-
-## Support
-
-For API-related issues or questions:
-- [INSERT_SUPPORT_CHANNEL]
-- [INSERT_DOCUMENTATION_LINK]
-
+Files expire automatically after **14 days** via S3 lifecycle rules.

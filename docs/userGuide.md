@@ -1,177 +1,136 @@
-# User Guide
+# User Guide — W. P. Carey Real Estate Program AI Presentation Coach
 
-This guide provides step-by-step instructions for using [INSERT_PROJECT_NAME].
-
----
-
-## Prerequisites
-
-**Please ensure the application is deployed before proceeding.** 
-
-See the [Deployment Guide](./deploymentGuide.md) for deployment instructions.
+**Live App:** [https://main.d2v1f9m26bi3az.amplifyapp.com](https://main.d2v1f9m26bi3az.amplifyapp.com)
 
 ---
 
-## Introduction
+## What This Tool Does
 
-[INSERT_APPLICATION_INTRODUCTION - Explain what the application does and its main functionality]
-
-[INSERT_PROJECT_NAME] is designed to [INSERT_PRIMARY_PURPOSE]. Users can [INSERT_KEY_CAPABILITIES].
-
-### Key Features
-- [INSERT_FEATURE_1]
-- [INSERT_FEATURE_2]
-- [INSERT_FEATURE_3]
-- [INSERT_FEATURE_4]
+The AI Presentation Coach helps W. P. Carey students practice real estate development presentations by simulating four different stakeholder audiences. You record yourself presenting, see real-time delivery metrics, get AI-written feedback afterward, and can run a live voice Q&A with an AI persona that asks tough stakeholder questions.
 
 ---
 
 ## Getting Started
 
-### Step 1: Access the Application
+### Step 1 — Sign In
 
-Navigate to the application URL: `[INSERT_APPLICATION_URL]`
+Navigate to the app and sign in with your university email. First-time users can self-register with a university email address — you'll receive a verification code by email.
 
-![Step 1 - Application Landing Page](./media/step-1-landing-page.png)
+### Step 2 — Select a Persona
 
-> **[PLACEHOLDER]** Please provide a screenshot of the application landing page and save as `docs/media/step-1-landing-page.png`
+After signing in you'll see the persona selection screen. Choose the stakeholder you want to practice with:
 
-- [INSERT_DESCRIPTION_OF_LANDING_PAGE]
+| Persona | Focus |
+|---------|-------|
+| **Commercial Lender** | Financials, debt service coverage, risk, loan structure |
+| **Public Official** | Zoning, community impact, permitting, regulatory compliance |
+| **Real Estate Agent** | Market comparables, listing strategy, buyer/seller dynamics |
+| **Negotiation Counterparty** | Deal terms, leverage, concessions, counter-offers |
 
----
+Each persona has a different communication style, different time limits, and different delivery benchmarks — your metrics targets adjust accordingly.
 
-### Step 2: [INSERT_STEP_2_NAME]
+### Step 3 — Configure the Session
 
-[INSERT_STEP_2_INSTRUCTIONS]
+Before starting you can:
 
-![Step 2 - [INSERT_STEP_NAME]](./media/step-2-action.png)
+- **Upload a PDF presentation** — your slides will appear side-by-side with your camera feed during recording
+- **Add custom notes** (up to 500 words) — give the persona specific context about your deal, property, or scenario
+- **Toggle real-time feedback** — choose whether to see live metrics during the session or practice without them
 
-> **[PLACEHOLDER]** Please provide a screenshot showing [INSERT_WHAT_TO_CAPTURE] and save as `docs/media/step-2-action.png`
+### Step 4 — Camera & Mic Calibration
 
-- [INSERT_DESCRIPTION_OF_WHAT_USER_SEES]
-- [INSERT_ANY_IMPORTANT_NOTES]
+Click **Turn On Camera & Calibrate**. A calibration panel appears showing:
+- Your live camera feed with a face mesh overlay
+- Eye contact status (center your face and look at the camera)
+- A mic check to confirm your audio level is sufficient
 
----
+Click **Continue to Mic Calibration** then **Everything Looks Good** when both are ready.
 
-### Step 3: [INSERT_STEP_3_NAME]
+### Step 5 — Practice Session
 
-[INSERT_STEP_3_INSTRUCTIONS]
+The main recording view has three sections:
 
-![Step 3 - [INSERT_STEP_NAME]](./media/step-3-action.png)
+**Top — Delivery Metrics Bar**
+Six live metrics update every second while you record:
 
-> **[PLACEHOLDER]** Please provide a screenshot showing [INSERT_WHAT_TO_CAPTURE] and save as `docs/media/step-3-action.png`
+| Metric | What It Measures | Typical Target |
+|--------|-----------------|----------------|
+| Speaking Pace | Words per minute (30s rolling window) | 130–160 wpm |
+| Volume | Microphone input level | Consistent, avoid sudden drops |
+| Eye Contact | Whether you're looking at the camera | ≥ 65% of the time |
+| Filler Words | "um", "uh", "like", "basically", etc. | ≤ 3 per 30 seconds |
+| Pauses | Deliberate silences > 3 seconds | ≥ 4 per 30 seconds |
+| Monotone Level | Pitch and volume variation | Lower is better |
 
-- [INSERT_DESCRIPTION_OF_WHAT_USER_SEES]
+**Middle — Camera + Slides (side-by-side)**
+- Left: your live camera feed with recording badge
+- Right: your uploaded PDF (or a placeholder if none was uploaded)
 
----
+**Bottom — Live Transcription**
+Words appear as you speak, with partial results showing in real time.
 
-### Step 4: [INSERT_STEP_4_NAME]
+Use **Pause** to take a break mid-session (metrics stop collecting). Click **Finish Recording** when done.
 
-[INSERT_STEP_4_INSTRUCTIONS]
+### Step 6 — Review Your Analytics
 
-![Step 4 - [INSERT_STEP_NAME]](./media/step-4-action.png)
+After finishing, the app processes your session (takes 15–30 seconds). You'll see:
 
-> **[PLACEHOLDER]** Please provide a screenshot showing [INSERT_WHAT_TO_CAPTURE] and save as `docs/media/step-4-action.png`
+- **Delivery Summary** — overall scores for pace, eye contact, filler words, and pauses with trend charts
+- **Written AI Feedback** — role-specific commentary from the persona's perspective: what you did well, what to improve, how your delivery would land with that stakeholder
+- **Transcript** — full text of your presentation with filler words highlighted
+- **Per-second metric charts** — timeline graphs of each metric across the session
 
-- [INSERT_DESCRIPTION_OF_WHAT_USER_SEES]
+### Step 7 — Live Voice Q&A (Optional)
 
----
+After reviewing analytics, click **Start Q&A Session** to practice answering live questions from the persona.
 
-### Step 5: [INSERT_STEP_5_NAME - e.g., "View Results"]
+The persona avatar will:
+1. Introduce itself and begin asking questions based on your presentation
+2. React to your answers and ask follow-ups
+3. Wrap up after the allotted Q&A time (typically 5 minutes)
 
-[INSERT_STEP_5_INSTRUCTIONS]
-
-![Step 5 - [INSERT_STEP_NAME]](./media/step-5-result.png)
-
-> **[PLACEHOLDER]** Please provide a screenshot showing the final result/output and save as `docs/media/step-5-result.png`
-
-- [INSERT_DESCRIPTION_OF_FINAL_OUTPUT]
-
----
-
-## Common Use Cases
-
-### Use Case 1: [INSERT_USE_CASE_NAME]
-
-[INSERT_USE_CASE_DESCRIPTION]
-
-**Steps:**
-1. [INSERT_STEP]
-2. [INSERT_STEP]
-3. [INSERT_STEP]
-
-![Use Case 1 Example](./media/use-case-1.png)
-
-> **[PLACEHOLDER]** Please provide a screenshot demonstrating this use case
-
----
-
-### Use Case 2: [INSERT_USE_CASE_NAME]
-
-[INSERT_USE_CASE_DESCRIPTION]
-
-**Steps:**
-1. [INSERT_STEP]
-2. [INSERT_STEP]
-3. [INSERT_STEP]
-
-![Use Case 2 Example](./media/use-case-2.png)
-
-> **[PLACEHOLDER]** Please provide a screenshot demonstrating this use case
+After the Q&A ends, you receive a second round of AI feedback specifically about your Q&A responses — clarity, depth, handling of tough questions, composure.
 
 ---
 
-## Tips and Best Practices
+## Tips for Best Results
 
-- **Tip 1**: [INSERT_TIP]
-- **Tip 2**: [INSERT_TIP]
-- **Tip 3**: [INSERT_TIP]
-- **Tip 4**: [INSERT_TIP]
-
----
-
-## Frequently Asked Questions (FAQ)
-
-### Q: [INSERT_QUESTION_1]
-**A:** [INSERT_ANSWER_1]
-
-### Q: [INSERT_QUESTION_2]
-**A:** [INSERT_ANSWER_2]
-
-### Q: [INSERT_QUESTION_3]
-**A:** [INSERT_ANSWER_3]
-
-### Q: [INSERT_QUESTION_4]
-**A:** [INSERT_ANSWER_4]
+- **Look directly at your webcam**, not at your screen — the gaze tracker reads your eye position relative to the camera lens
+- **Speak at a natural pace** — the 130–160 wpm target is conversational; don't rush or artificially slow down
+- **Use deliberate pauses** after key points — the pause counter rewards strategic silence, not just talking faster
+- **Upload your actual slides** — the side-by-side view helps you practice natural transitions between slides while maintaining eye contact
+- **Use the custom notes field** to give the persona specific deal details — the more context you provide, the more targeted the Q&A questions will be
+- **Practice the same persona multiple times** — each session is independent, so you can track your improvement over multiple attempts
 
 ---
 
-## Troubleshooting
+## For Faculty / Admins
 
-### Issue: [INSERT_COMMON_USER_ISSUE_1]
-**Solution:** [INSERT_SOLUTION]
+Faculty with Admin group access see an additional **Admin** tab with:
 
-### Issue: [INSERT_COMMON_USER_ISSUE_2]
-**Solution:** [INSERT_SOLUTION]
+- **Persona Management** — create, edit, and delete personas; configure time limits, best-practice thresholds, Anam avatar IDs, and coaching prompts
+- **Session Management** — view past sessions for any student (sessions are stored in S3 for 14 days)
 
-### Issue: [INSERT_COMMON_USER_ISSUE_3]
-**Solution:** [INSERT_SOLUTION]
+To grant admin access, add the user to the **Admin** Cognito group in the AWS Console → Cognito → User Pool → Users → select user → Add to group.
 
 ---
 
-## Getting Help
+## Frequently Asked Questions
 
-If you encounter issues not covered in this guide:
+**Q: My camera is black after clicking "Turn On Camera".**
+Make sure the browser has camera permission for this site (look for the camera icon in the address bar). HTTPS is required — this works on the Amplify URL but not over plain HTTP.
 
-- [INSERT_SUPPORT_CHANNEL_1 - e.g., "Open an issue on GitHub"]
-- [INSERT_SUPPORT_CHANNEL_2 - e.g., "Contact support at email@example.com"]
-- [INSERT_SUPPORT_CHANNEL_3]
+**Q: The transcript isn't capturing my words accurately.**
+Amazon Transcribe works best in a quiet environment with a close-proximity microphone. Reduce background noise and speak clearly toward your device's mic.
 
----
+**Q: The filler word count seems off.**
+Filler detection relies on Amazon Transcribe — it uses a 30-second rolling window so the count resets every 30 seconds rather than accumulating for the whole session.
 
-## Next Steps
+**Q: The Q&A avatar isn't showing / Anam fails.**
+The Anam AI API key may be missing or expired. Contact your administrator to verify the `ANAM_API_KEY` is set on the backend Lambda.
 
-- Explore the [API Documentation](./APIDoc.md) for programmatic access
-- Check the [Architecture Deep Dive](./architectureDeepDive.md) to understand how the system works
-- See the [Modification Guide](./modificationGuide.md) if you want to customize the application
+**Q: Can I re-do a session?**
+Yes — each session gets a unique ID. Previous sessions aren't overwritten; they expire from S3 after 14 days.
 
+**Q: Where is my data stored?**
+All session data (video, transcripts, analytics) is stored in an S3 bucket in your institution's AWS account. Nothing is shared externally. Data expires after 14 days.
