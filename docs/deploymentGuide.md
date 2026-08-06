@@ -99,9 +99,28 @@ aws amplify start-deployment \
 
 ## Prerequisites
 
-Before deploying, enable these Bedrock models in **us-east-1** ([open console](https://us-east-1.console.aws.amazon.com/bedrock/home#/modelaccess)):
-- `Amazon Nova Lite`
-- `Amazon Nova 2 Sonic`
+Before running `deploy.sh`, complete these one-time account-level steps:
+
+### 1. Enable Bedrock Model Access (us-east-1)
+
+Open the [Bedrock Model Access console](https://us-east-1.console.aws.amazon.com/bedrock/home#/modelaccess) and enable all four models:
+
+| Model | Used For |
+|-------|---------|
+| Amazon Nova 2 Sonic | Live voice Q&A (AgentCore) |
+| Amazon Nova Lite | Q&A session analytics |
+| Anthropic Claude Haiku (latest cross-region) | Post-session written feedback |
+| Anthropic Claude 3.5 Haiku | PDF content analysis |
+
+> Access requests are usually approved within a few minutes. Deployment will fail if any of these are not enabled.
+
+### 2. Enable Bedrock AgentCore
+
+Bedrock AgentCore must be activated in your account before the AgentCore CDK stack can deploy. In the AWS Console, navigate to **Amazon Bedrock → AgentCore** and follow the one-time activation prompt if present.
+
+### 3. Get an Anam AI API Key
+
+The `deploy.sh` script will prompt you for this. Get it from [app.anam.ai](https://app.anam.ai) → Account Settings → API Keys. Default persona IDs are pre-filled in the script — press Enter to use them unless you have your own Anam account with different personas.
 
 ---
 
