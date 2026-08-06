@@ -7,7 +7,6 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as bedrockl1 from 'aws-cdk-lib/aws-bedrock';
 import { NagSuppressions } from 'cdk-nag';
 import * as agentcore from '@aws-cdk/aws-bedrock-agentcore-alpha';
@@ -21,13 +20,6 @@ export interface AgentCoreStackProps extends cdk.StackProps {
     guardrailId: string;
     guardrailVersion: string;
     guardrailArn: string;
-    /**
-     * Optional: pre-built ECR image URI (e.g. for CloudShell deployments where
-     * Docker is not available). Format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
-     * Pass via: cdk deploy -c agentCoreImageUri=<uri>
-     * If omitted, the image is built locally from backend/agentcore/Dockerfile.
-     */
-    agentCoreImageUri?: string;
 }
 
 export class AgentCoreStack extends cdk.Stack {
@@ -37,26 +29,12 @@ export class AgentCoreStack extends cdk.Stack {
         super(scope, id, props);
 
         // ── AgentCore Docker image ──────────────────────────────────────
-        // If a pre-built image URI is supplied (e.g. for CloudShell deployments
-        // where Docker is unavailable), use it directly. Otherwise build locally.
-        let ecrRepository: ecr.IRepository;
-        let imageTag: string;
-
-        if (props.agentCoreImageUri) {
-            // Parse "account.dkr.ecr.region.amazonaws.com/repo-name:tag"
-            const uriParts = props.agentCoreImageUri.split('/');
-            const repoAndTag = uriParts.slice(1).join('/');
-            const [repoName, tag] = repoAndTag.split(':');
-            ecrRepository = ecr.Repository.fromRepositoryName(this, 'AgentCoreRepo', repoName);
-            imageTag = tag ?? 'latest';
-        } else {
-            const agentCoreImage = new ecrAssets.DockerImageAsset(this, 'AgentCoreImage', {
-                directory: path.join(__dirname, '..', 'agentcore'),
-                platform: ecrAssets.Platform.LINUX_ARM64,
-            });
-            ecrRepository = agentCoreImage.repository;
-            imageTag = agentCoreImage.imageTag;
-        }
+        const agentCoreImage = new ecrAssets.DockerImageAsset(this, 'AgentCoreImage', {
+            directory: path.join(__dirname, '..', 'agentcore'),
+            platform: ecrAssets.Platform.LINUX_ARM64,
+        });
+        const ecrRepository = agentCoreImage.repository;
+        const imageTag = agentCoreImage.imageTag;
 
         // ── AgentCore Runtime ───────────────────────────────────────────
         const agentCoreRuntime: agentcore.Runtime = new agentcore.Runtime(this, 'LiveQAAgentRuntime', {
