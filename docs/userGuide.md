@@ -106,12 +106,9 @@ After the Q&A ends, you receive a second round of AI feedback specifically about
 
 ## For Faculty / Admins
 
-Faculty with Admin group access see an additional **Admin** tab with:
+Personas are pre-configured at deployment time and stored in DynamoDB. To add or modify a persona, update the record directly in the DynamoDB table via the AWS Console (DynamoDB → Tables → select the PersonasTable → Explore items) or using the AWS CLI with `aws dynamodb put-item`.
 
-- **Persona Management** — create, edit, and delete personas; configure time limits, best-practice thresholds, Anam avatar IDs, and coaching prompts
-- **Session Management** — view past sessions for any student (sessions are stored in S3 for 14 days)
-
-To grant admin access, add the user to the **Admin** Cognito group in the AWS Console → Cognito → User Pool → Users → select user → Add to group.
+Each persona record supports: name, description, coaching prompt, time limits, best-practice thresholds, Anam avatar persona ID, and voice ID. See the [Modification Guide](./docs/modificationGuide.md#add-or-modify-a-persona) for the full field reference.
 
 ---
 

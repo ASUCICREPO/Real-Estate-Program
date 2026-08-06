@@ -47,9 +47,41 @@ This guide is for developers who want to extend, customize, or adapt the platfor
 
 ### Add or Modify a Persona
 
-Personas live in DynamoDB and are managed through the app's Admin panel (sign in as Admin → Personas). No code change needed.
+Personas are stored in DynamoDB. There is no in-app admin UI — manage them directly via the AWS Console or CLI.
 
-To change what fields a persona can have, update the `Persona` interface in `frontend/app/config/config.ts` and the DynamoDB read/write logic in `backend/lambda/persona-crud/index.py`.
+**Via AWS Console:**
+1. Open DynamoDB → Tables → select the `PersonasTable`
+2. Click **Explore items** → **Create item**
+3. Fill in the fields as JSON (see schema below)
+
+**Via AWS CLI:**
+```bash
+aws dynamodb put-item \
+  --table-name <PersonasTableName> \
+  --item '{
+    "personaID":      {"S": "your-uuid-here"},
+    "name":           {"S": "Commercial Lender"},
+    "description":    {"S": "..."},
+    "personaPrompt":  {"S": "You are a commercial lender evaluating..."},
+    "expertise":      {"S": "intermediate"},
+    "keyPriorities":  {"L": [{"S": "debt service coverage"}, {"S": "LTV"}]},
+    "presentationTime": {"S": "15 minutes"},
+    "communicationStyle": {"S": "analytical"},
+    "timeLimitSec":   {"N": "900"},
+    "qaTimeLimitSec": {"N": "300"},
+    "voiceId":        {"S": "matthew"},
+    "anamPersonaId":  {"S": "26981553-4601-4799-b64b-7dfa1580de8c"},
+    "icon":           {"S": "briefcase"},
+    "bestPractices":  {"M": {
+      "wpm":         {"M": {"min": {"N": "130"}, "max": {"N": "160"}}},
+      "eyeContact":  {"M": {"min": {"N": "65"}}},
+      "fillerWords": {"M": {"max": {"N": "3"}}},
+      "pauses":      {"M": {"min": {"N": "4"}}}
+    }}
+  }'
+```
+
+To change what fields a persona can have, update the `Persona` interface in `frontend/app/config/config.ts` and the read/write logic in `backend/lambda/persona-crud/index.py`.
 
 ---
 
