@@ -163,6 +163,132 @@ phases:
           echo "WARNING: No Lambda containing 'AnamSessionToken' found -- skipping ANAM_API_KEY injection."
         fi
 
+      # Seed the four personas into DynamoDB
+      - |
+        echo "Seeding personas into DynamoDB..."
+        SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g' | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+        BACKEND_STACK="RealEstateProgramStack-${SANITIZED_BRANCH}"
+        PERSONAS_TABLE=$(aws cloudformation describe-stacks \
+          --stack-name "$BACKEND_STACK" \
+          --query "Stacks[0].Outputs[?OutputKey=='PersonasTableName'].OutputValue" \
+          --output text 2>/dev/null || echo "")
+        if [ -z "$PERSONAS_TABLE" ] || [ "$PERSONAS_TABLE" = "None" ]; then
+          echo "WARNING: Could not find PersonasTableName in stack outputs — skipping persona seeding."
+        else
+          echo "Seeding into table: $PERSONAS_TABLE"
+          node -e "
+            const { DynamoDBClient, PutItemCommand } = require('@aws-sdk/client-dynamodb');
+            const client = new DynamoDBClient({ region: process.env.AWS_DEFAULT_REGION });
+            const table = process.env.PERSONAS_TABLE;
+
+            const personas = [
+              {
+                personaID: process.env.ANAM_LENDER_ID,
+                name: 'Commercial Lender',
+                description: 'A commercial lender evaluating the financial viability and risk profile of your real estate development proposal.',
+                personaPrompt: 'You are a senior commercial lender at a major bank evaluating a real estate development loan application. Your primary concerns are debt service coverage ratio, loan-to-value ratio, project feasibility, borrower experience, and market conditions. Ask probing questions about financial projections, risk mitigation, and exit strategy. Be analytical and skeptical but professional.',
+                expertise: 'expert',
+                communicationStyle: 'analytical',
+                keyPriorities: ['Debt service coverage ratio', 'Loan-to-value ratio', 'Project feasibility', 'Borrower track record', 'Market conditions'],
+                presentationTime: '15 minutes',
+                timeLimitSec: 900,
+                qaTimeLimitSec: 300,
+                voiceId: 'matthew',
+                anamPersonaId: process.env.ANAM_LENDER_ID,
+                icon: 'briefcase',
+                bestPractices: { wpm: { min: 130, max: 160 }, eyeContact: { min: 65 }, fillerWords: { max: 3 }, pauses: { min: 4 } },
+                scoringWeights: { pace: 0.25, eyeContact: 0.30, fillerWords: 0.20, pauses: 0.25 }
+              },
+              {
+                personaID: process.env.ANAM_OFFICIAL_ID,
+                name: 'Public Official',
+                description: 'A city planning or zoning official reviewing your development for community impact, regulatory compliance, and public benefit.',
+                personaPrompt: 'You are a city planning commissioner reviewing a real estate development proposal. Your concerns include zoning compliance, community impact, environmental considerations, traffic, affordable housing requirements, and public benefit. Ask about how the project benefits the community, addresses regulatory requirements, and mitigates negative impacts. Be thorough and community-focused.',
+                expertise: 'intermediate',
+                communicationStyle: 'formal',
+                keyPriorities: ['Zoning compliance', 'Community impact', 'Environmental considerations', 'Traffic and infrastructure', 'Affordable housing'],
+                presentationTime: '15 minutes',
+                timeLimitSec: 900,
+                qaTimeLimitSec: 300,
+                voiceId: 'tiffany',
+                anamPersonaId: process.env.ANAM_OFFICIAL_ID,
+                icon: 'people',
+                bestPractices: { wpm: { min: 130, max: 160 }, eyeContact: { min: 65 }, fillerWords: { max: 3 }, pauses: { min: 4 } },
+                scoringWeights: { pace: 0.25, eyeContact: 0.30, fillerWords: 0.20, pauses: 0.25 }
+              },
+              {
+                personaID: process.env.ANAM_AGENT_ID,
+                name: 'Real Estate Agent',
+                description: 'An experienced real estate agent assessing your property from a market perspective — comparable sales, buyer appeal, and listing strategy.',
+                personaPrompt: 'You are an experienced real estate agent with deep knowledge of local market conditions. You are evaluating a real estate development or investment from a market perspective. Focus on comparable sales, market timing, buyer/tenant demand, pricing strategy, and competitive positioning. Be practical, market-driven, and direct.',
+                expertise: 'intermediate',
+                communicationStyle: 'conversational',
+                keyPriorities: ['Market comparables', 'Pricing strategy', 'Buyer/tenant demand', 'Market timing', 'Competitive positioning'],
+                presentationTime: '15 minutes',
+                timeLimitSec: 900,
+                qaTimeLimitSec: 300,
+                voiceId: 'amy',
+                anamPersonaId: process.env.ANAM_AGENT_ID,
+                icon: 'school',
+                bestPractices: { wpm: { min: 130, max: 160 }, eyeContact: { min: 65 }, fillerWords: { max: 3 }, pauses: { min: 4 } },
+                scoringWeights: { pace: 0.25, eyeContact: 0.30, fillerWords: 0.20, pauses: 0.25 }
+              },
+              {
+                personaID: process.env.ANAM_NEGOTIATOR_ID,
+                name: 'Negotiation Counterparty',
+                description: 'A tough negotiator on the other side of a real estate transaction — testing your deal terms, leverage, and negotiation strategy.',
+                personaPrompt: 'You are a sophisticated negotiator representing the other party in a real estate transaction. Your goal is to test the presenter's negotiation strategy, identify weaknesses in their position, and push for better terms. Ask challenging questions about pricing justification, contingencies, timeline, and deal structure. Be assertive, strategic, and look for leverage points.',
+                expertise: 'expert',
+                communicationStyle: 'competitive',
+                keyPriorities: ['Deal terms', 'Pricing justification', 'Contingencies', 'Timeline', 'Leverage and concessions'],
+                presentationTime: '15 minutes',
+                timeLimitSec: 900,
+                qaTimeLimitSec: 300,
+                voiceId: 'matthew',
+                anamPersonaId: process.env.ANAM_NEGOTIATOR_ID,
+                icon: 'mic',
+                bestPractices: { wpm: { min: 130, max: 160 }, eyeContact: { min: 65 }, fillerWords: { max: 3 }, pauses: { min: 4 } },
+                scoringWeights: { pace: 0.25, eyeContact: 0.30, fillerWords: 0.20, pauses: 0.25 }
+              }
+            ];
+
+            function toItem(obj) {
+              const item = {};
+              for (const [k, v] of Object.entries(obj)) {
+                if (v === null || v === undefined) item[k] = { NULL: true };
+                else if (typeof v === 'string') item[k] = { S: v };
+                else if (typeof v === 'number') item[k] = { N: String(v) };
+                else if (typeof v === 'boolean') item[k] = { BOOL: v };
+                else if (Array.isArray(v)) item[k] = { L: v.map(i => typeof i === 'string' ? { S: i } : { N: String(i) }) };
+                else if (typeof v === 'object') {
+                  const m = {};
+                  for (const [mk, mv] of Object.entries(v)) {
+                    if (typeof mv === 'object' && !Array.isArray(mv)) {
+                      const nested = {};
+                      for (const [nk, nv] of Object.entries(mv)) {
+                        nested[nk] = typeof nv === 'number' ? { N: String(nv) } : { S: String(nv) };
+                      }
+                      m[mk] = { M: nested };
+                    } else {
+                      m[mk] = typeof mv === 'number' ? { N: String(mv) } : { S: String(mv) };
+                    }
+                  }
+                  item[k] = { M: m };
+                }
+              }
+              return item;
+            }
+
+            (async () => {
+              for (const p of personas) {
+                await client.send(new PutItemCommand({ TableName: table, Item: toItem(p) }));
+                console.log('Seeded:', p.name);
+              }
+              console.log('All personas seeded successfully.');
+            })().catch(e => { console.error('Seeding failed:', e); process.exit(1); });
+          "
+        fi
+
       # Bare-mode: deploy frontend to Amplify
       - |
         if [ -z "$GITHUB_TOKEN" ] && [ -f "$CODEBUILD_SRC_DIR/.bare_amplify_app_id" ]; then

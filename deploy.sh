@@ -134,17 +134,44 @@ echo -e "${BLUE}Stack Name: $STACK_NAME${NC}"
 echo ""
 
 # --------------------------------------------------
-# 4. Anam API Key (required)
+# 4. Anam Configuration (API key + persona IDs)
 # --------------------------------------------------
-echo -e "${YELLOW}Enter your Anam AI API key (required — get one at app.anam.ai → Account Settings → API Keys):${NC}"
-read -rs -p "> " ANAM_API_KEY
+echo -e "${BLUE}─── Anam AI Configuration ───────────────────────────────────${NC}"
+echo -e "${YELLOW}Anam powers the AI avatar personas for live voice Q&A.${NC}"
+echo -e "${YELLOW}Get your API key and persona IDs at app.anam.ai${NC}"
 echo ""
 
-if [ -z "$ANAM_API_KEY" ]; then
-    echo -e "${RED}Error: ANAM_API_KEY is required.${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Anam API key provided${NC}"
+DEFAULT_ANAM_API_KEY="19182ecc-5907-44b9-914c-8f842cddaca6"
+DEFAULT_LENDER_ID="26981553-4601-4799-b64b-7dfa1580de8c"
+DEFAULT_OFFICIAL_ID="855745e8-056d-4848-a5a0-3752e88cdecc"
+DEFAULT_AGENT_ID="36908df0-128e-48c6-b2f3-cbf007707d00"
+DEFAULT_NEGOTIATOR_ID="19e62cdb-8c39-4b58-a96b-a8a4cc5899e0"
+
+echo -e "${YELLOW}Anam API Key [press Enter to use default]:${NC}"
+read -rs -p "> " ANAM_API_KEY
+echo ""
+ANAM_API_KEY="${ANAM_API_KEY:-$DEFAULT_ANAM_API_KEY}"
+echo -e "${GREEN}✓ Anam API key set${NC}"
+
+echo -e "${YELLOW}Anam Persona ID — Commercial Lender [Enter for default]:${NC}"
+read -rp "> " ANAM_LENDER_ID
+ANAM_LENDER_ID="${ANAM_LENDER_ID:-$DEFAULT_LENDER_ID}"
+echo -e "${GREEN}  ✓ Commercial Lender: $ANAM_LENDER_ID${NC}"
+
+echo -e "${YELLOW}Anam Persona ID — Public Official [Enter for default]:${NC}"
+read -rp "> " ANAM_OFFICIAL_ID
+ANAM_OFFICIAL_ID="${ANAM_OFFICIAL_ID:-$DEFAULT_OFFICIAL_ID}"
+echo -e "${GREEN}  ✓ Public Official: $ANAM_OFFICIAL_ID${NC}"
+
+echo -e "${YELLOW}Anam Persona ID — Real Estate Agent [Enter for default]:${NC}"
+read -rp "> " ANAM_AGENT_ID
+ANAM_AGENT_ID="${ANAM_AGENT_ID:-$DEFAULT_AGENT_ID}"
+echo -e "${GREEN}  ✓ Real Estate Agent: $ANAM_AGENT_ID${NC}"
+
+echo -e "${YELLOW}Anam Persona ID — Negotiation Counterparty [Enter for default]:${NC}"
+read -rp "> " ANAM_NEGOTIATOR_ID
+ANAM_NEGOTIATOR_ID="${ANAM_NEGOTIATOR_ID:-$DEFAULT_NEGOTIATOR_ID}"
+echo -e "${GREEN}  ✓ Negotiation Counterparty: $ANAM_NEGOTIATOR_ID${NC}"
 echo ""
 
 # --------------------------------------------------
@@ -345,12 +372,16 @@ ENVIRONMENT='{
   "computeType": "BUILD_GENERAL1_LARGE",
   "privilegedMode": true,
   "environmentVariables": [
-    {"name":"BRANCH_NAME",   "value":"'"$BRANCH_NAME"'",    "type":"PLAINTEXT"},
-    {"name":"STACK_NAME",    "value":"'"$STACK_NAME"'",     "type":"PLAINTEXT"},
-    {"name":"ANAM_API_KEY",  "value":"'"$ANAM_API_KEY"'",   "type":"PLAINTEXT"},
-    {"name":"GITHUB_TOKEN",  "value":"'"$GITHUB_TOKEN"'",   "type":"PLAINTEXT"},
-    {"name":"GITHUB_OWNER",  "value":"'"$GITHUB_OWNER"'",   "type":"PLAINTEXT"},
-    {"name":"GITHUB_REPO",   "value":"'"$GITHUB_REPO_NAME"'","type":"PLAINTEXT"}
+    {"name":"BRANCH_NAME",         "value":"'"$BRANCH_NAME"'",        "type":"PLAINTEXT"},
+    {"name":"STACK_NAME",          "value":"'"$STACK_NAME"'",         "type":"PLAINTEXT"},
+    {"name":"ANAM_API_KEY",        "value":"'"$ANAM_API_KEY"'",       "type":"PLAINTEXT"},
+    {"name":"ANAM_LENDER_ID",      "value":"'"$ANAM_LENDER_ID"'",     "type":"PLAINTEXT"},
+    {"name":"ANAM_OFFICIAL_ID",    "value":"'"$ANAM_OFFICIAL_ID"'",   "type":"PLAINTEXT"},
+    {"name":"ANAM_AGENT_ID",       "value":"'"$ANAM_AGENT_ID"'",      "type":"PLAINTEXT"},
+    {"name":"ANAM_NEGOTIATOR_ID",  "value":"'"$ANAM_NEGOTIATOR_ID"'", "type":"PLAINTEXT"},
+    {"name":"GITHUB_TOKEN",        "value":"'"$GITHUB_TOKEN"'",       "type":"PLAINTEXT"},
+    {"name":"GITHUB_OWNER",        "value":"'"$GITHUB_OWNER"'",       "type":"PLAINTEXT"},
+    {"name":"GITHUB_REPO",         "value":"'"$GITHUB_REPO_NAME"'",   "type":"PLAINTEXT"}
   ]
 }'
 

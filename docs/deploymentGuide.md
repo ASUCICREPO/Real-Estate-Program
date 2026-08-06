@@ -105,46 +105,11 @@ Before deploying, enable these Bedrock models in **us-east-1** ([open console](h
 
 ---
 
-## Seed Personas (first deploy only)
+## Seed Personas (handled automatically)
 
-The DynamoDB PersonasTable is empty after first deploy. There is no in-app admin UI — add personas directly via the AWS Console or CLI.
+Personas are seeded into DynamoDB automatically during deployment. The `deploy.sh` script prompts for Anam persona IDs (with the default IDs pre-filled — just press Enter to use them). If you have your own Anam account with different persona IDs, enter those instead.
 
-**AWS Console:** DynamoDB → Tables → `PersonasTable` → Explore items → Create item (JSON view).
-
-**AWS CLI example:**
-```bash
-PERSONAS_TABLE=$(aws cloudformation describe-stacks \
-  --stack-name RealEstateProgramStack-main \
-  --query "Stacks[0].Outputs[?OutputKey=='PersonasTableName'].OutputValue" \
-  --output text)
-
-aws dynamodb put-item --table-name "$PERSONAS_TABLE" --item '{
-  "personaID":          {"S": "19e62cdb-8c39-4b58-a96b-a8a4cc5899e0"},
-  "name":               {"S": "Negotiation Counterparty"},
-  "description":        {"S": "..."},
-  "personaPrompt":      {"S": "You are negotiating the terms of a real estate deal..."},
-  "expertise":          {"S": "intermediate"},
-  "keyPriorities":      {"L": [{"S": "deal terms"}, {"S": "leverage"}]},
-  "presentationTime":   {"S": "15 minutes"},
-  "communicationStyle": {"S": "competitive"},
-  "timeLimitSec":       {"N": "900"},
-  "qaTimeLimitSec":     {"N": "300"},
-  "voiceId":            {"S": "matthew"},
-  "anamPersonaId":      {"S": "19e62cdb-8c39-4b58-a96b-a8a4cc5899e0"},
-  "icon":               {"S": "people"}
-}'
-```
-
-Anam persona IDs for the four pre-configured stakeholders:
-
-| Persona | Anam Persona ID |
-|---------|----------------|
-| Commercial Lender | `26981553-4601-4799-b64b-7dfa1580de8c` |
-| Public Official | `855745e8-056d-4848-a5a0-3752e88cdecc` |
-| Real Estate Agent | `36908df0-128e-48c6-b2f3-cbf007707d00` |
-| Negotiation Counterparty | `19e62cdb-8c39-4b58-a96b-a8a4cc5899e0` |
-
-See the [Modification Guide](./modificationGuide.md#add-or-modify-a-persona) for the full field schema.
+If you need to add or modify a persona after deployment, see the [Modification Guide](./modificationGuide.md#add-or-modify-a-persona).
 
 ---
 
