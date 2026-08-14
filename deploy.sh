@@ -142,17 +142,17 @@ echo -e "${YELLOW}The app works without it — voice Q&A still runs, just no ava
 echo -e "${YELLOW}Get your API key and persona IDs at app.anam.ai${NC}"
 echo ""
 
-DEFAULT_ANAM_API_KEY="MTkxODJlY2MtNTkwNy00NGI5LTkxNGMtOGY4NDJjZGRhY2E2OndKWWJncGxPaG9CNitpbGFWSkFuTmJUSFVOdzUwUS95RHhLVS8zY2N4VEE9"
+DEFAULT_ANAM_API_KEY=""
 DEFAULT_LENDER_ID="26981553-4601-4799-b64b-7dfa1580de8c"
 DEFAULT_OFFICIAL_ID="855745e8-056d-4848-a5a0-3752e88cdecc"
 DEFAULT_AGENT_ID="36908df0-128e-48c6-b2f3-cbf007707d00"
 DEFAULT_NEGOTIATOR_ID="19e62cdb-8c39-4b58-a96b-a8a4cc5899e0"
 
-echo -e "${YELLOW}Anam API Key [press Enter to use default, or type 'skip' to disable avatars]:${NC}"
+echo -e "${YELLOW}Anam API Key [paste your key, or press Enter to skip avatars]:${NC}"
 read -rs -p "> " ANAM_API_KEY_INPUT
 echo ""
 
-if [ "$ANAM_API_KEY_INPUT" = "skip" ] || [ "$ANAM_API_KEY_INPUT" = "SKIP" ]; then
+if [ -z "$ANAM_API_KEY_INPUT" ] || [ "$ANAM_API_KEY_INPUT" = "skip" ] || [ "$ANAM_API_KEY_INPUT" = "SKIP" ]; then
     ANAM_API_KEY=""
     ANAM_LENDER_ID=""
     ANAM_OFFICIAL_ID=""
@@ -160,7 +160,7 @@ if [ "$ANAM_API_KEY_INPUT" = "skip" ] || [ "$ANAM_API_KEY_INPUT" = "SKIP" ]; the
     ANAM_NEGOTIATOR_ID=""
     echo -e "${BLUE}ℹ Anam skipped — avatars will be disabled, voice Q&A still works${NC}"
 else
-    ANAM_API_KEY="${ANAM_API_KEY_INPUT:-$DEFAULT_ANAM_API_KEY}"
+    ANAM_API_KEY="$ANAM_API_KEY_INPUT"
     echo -e "${GREEN}✓ Anam API key set${NC}"
 
     echo -e "${YELLOW}Anam Persona ID — Commercial Lender [Enter for default]:${NC}"
