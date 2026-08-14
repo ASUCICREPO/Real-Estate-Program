@@ -137,41 +137,52 @@ echo ""
 # 4. Anam Configuration (API key + persona IDs)
 # --------------------------------------------------
 echo -e "${BLUE}─── Anam AI Configuration ───────────────────────────────────${NC}"
-echo -e "${YELLOW}Anam powers the AI avatar personas for live voice Q&A.${NC}"
+echo -e "${YELLOW}Anam powers the AI avatar faces for live voice Q&A.${NC}"
+echo -e "${YELLOW}The app works without it — voice Q&A still runs, just no avatar face.${NC}"
 echo -e "${YELLOW}Get your API key and persona IDs at app.anam.ai${NC}"
 echo ""
 
-DEFAULT_ANAM_API_KEY="19182ecc-5907-44b9-914c-8f842cddaca6"
+DEFAULT_ANAM_API_KEY="MTkxODJlY2MtNTkwNy00NGI5LTkxNGMtOGY4NDJjZGRhY2E2OndKWWJncGxPaG9CNitpbGFWSkFuTmJUSFVOdzUwUS95RHhLVS8zY2N4VEE9"
 DEFAULT_LENDER_ID="26981553-4601-4799-b64b-7dfa1580de8c"
 DEFAULT_OFFICIAL_ID="855745e8-056d-4848-a5a0-3752e88cdecc"
 DEFAULT_AGENT_ID="36908df0-128e-48c6-b2f3-cbf007707d00"
 DEFAULT_NEGOTIATOR_ID="19e62cdb-8c39-4b58-a96b-a8a4cc5899e0"
 
-echo -e "${YELLOW}Anam API Key [press Enter to use default]:${NC}"
-read -rs -p "> " ANAM_API_KEY
+echo -e "${YELLOW}Anam API Key [press Enter to use default, or type 'skip' to disable avatars]:${NC}"
+read -rs -p "> " ANAM_API_KEY_INPUT
 echo ""
-ANAM_API_KEY="${ANAM_API_KEY:-$DEFAULT_ANAM_API_KEY}"
-echo -e "${GREEN}✓ Anam API key set${NC}"
 
-echo -e "${YELLOW}Anam Persona ID — Commercial Lender [Enter for default]:${NC}"
-read -rp "> " ANAM_LENDER_ID
-ANAM_LENDER_ID="${ANAM_LENDER_ID:-$DEFAULT_LENDER_ID}"
-echo -e "${GREEN}  ✓ Commercial Lender: $ANAM_LENDER_ID${NC}"
+if [ "$ANAM_API_KEY_INPUT" = "skip" ] || [ "$ANAM_API_KEY_INPUT" = "SKIP" ]; then
+    ANAM_API_KEY=""
+    ANAM_LENDER_ID=""
+    ANAM_OFFICIAL_ID=""
+    ANAM_AGENT_ID=""
+    ANAM_NEGOTIATOR_ID=""
+    echo -e "${BLUE}ℹ Anam skipped — avatars will be disabled, voice Q&A still works${NC}"
+else
+    ANAM_API_KEY="${ANAM_API_KEY_INPUT:-$DEFAULT_ANAM_API_KEY}"
+    echo -e "${GREEN}✓ Anam API key set${NC}"
 
-echo -e "${YELLOW}Anam Persona ID — Public Official [Enter for default]:${NC}"
-read -rp "> " ANAM_OFFICIAL_ID
-ANAM_OFFICIAL_ID="${ANAM_OFFICIAL_ID:-$DEFAULT_OFFICIAL_ID}"
-echo -e "${GREEN}  ✓ Public Official: $ANAM_OFFICIAL_ID${NC}"
+    echo -e "${YELLOW}Anam Persona ID — Commercial Lender [Enter for default]:${NC}"
+    read -rp "> " ANAM_LENDER_ID
+    ANAM_LENDER_ID="${ANAM_LENDER_ID:-$DEFAULT_LENDER_ID}"
+    echo -e "${GREEN}  ✓ Commercial Lender: $ANAM_LENDER_ID${NC}"
 
-echo -e "${YELLOW}Anam Persona ID — Real Estate Agent [Enter for default]:${NC}"
-read -rp "> " ANAM_AGENT_ID
-ANAM_AGENT_ID="${ANAM_AGENT_ID:-$DEFAULT_AGENT_ID}"
-echo -e "${GREEN}  ✓ Real Estate Agent: $ANAM_AGENT_ID${NC}"
+    echo -e "${YELLOW}Anam Persona ID — Public Official [Enter for default]:${NC}"
+    read -rp "> " ANAM_OFFICIAL_ID
+    ANAM_OFFICIAL_ID="${ANAM_OFFICIAL_ID:-$DEFAULT_OFFICIAL_ID}"
+    echo -e "${GREEN}  ✓ Public Official: $ANAM_OFFICIAL_ID${NC}"
 
-echo -e "${YELLOW}Anam Persona ID — Negotiation Counterparty [Enter for default]:${NC}"
-read -rp "> " ANAM_NEGOTIATOR_ID
-ANAM_NEGOTIATOR_ID="${ANAM_NEGOTIATOR_ID:-$DEFAULT_NEGOTIATOR_ID}"
-echo -e "${GREEN}  ✓ Negotiation Counterparty: $ANAM_NEGOTIATOR_ID${NC}"
+    echo -e "${YELLOW}Anam Persona ID — Real Estate Agent [Enter for default]:${NC}"
+    read -rp "> " ANAM_AGENT_ID
+    ANAM_AGENT_ID="${ANAM_AGENT_ID:-$DEFAULT_AGENT_ID}"
+    echo -e "${GREEN}  ✓ Real Estate Agent: $ANAM_AGENT_ID${NC}"
+
+    echo -e "${YELLOW}Anam Persona ID — Negotiation Counterparty [Enter for default]:${NC}"
+    read -rp "> " ANAM_NEGOTIATOR_ID
+    ANAM_NEGOTIATOR_ID="${ANAM_NEGOTIATOR_ID:-$DEFAULT_NEGOTIATOR_ID}"
+    echo -e "${GREEN}  ✓ Negotiation Counterparty: $ANAM_NEGOTIATOR_ID${NC}"
+fi
 echo ""
 
 # --------------------------------------------------
