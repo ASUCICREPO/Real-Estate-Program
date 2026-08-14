@@ -64,7 +64,20 @@ For a detailed explanation, see the [Architecture Deep Dive](./docs/architecture
 
 For complete deployment instructions, see the [Deployment Guide](./docs/deploymentGuide.md).
 
-**Quick Start (CloudShell — no local tooling needed):**
+### Prerequisites (complete before deploying)
+
+1. **Enable Bedrock Model Access** in us-east-1 — [open console](https://us-east-1.console.aws.amazon.com/bedrock/home#/modelaccess):
+   - Amazon Nova 2 Sonic (live voice Q&A)
+   - Amazon Nova Lite (Q&A analytics)
+   - Anthropic Claude Haiku 4.5 (post-session feedback)
+   - Anthropic Claude 3.5 Haiku (PDF content analysis)
+
+2. **Enable Bedrock AgentCore** — navigate to Amazon Bedrock → AgentCore in the AWS Console and complete the one-time activation.
+
+3. **Get an Anam AI API key** — sign up at [app.anam.ai](https://app.anam.ai) → Account Settings → API Keys.
+
+### Quick Start (CloudShell — no local tooling needed)
+
 ```bash
 git clone https://github.com/ASUCICREPO/Real-Estate-Program.git
 cd Real-Estate-Program
