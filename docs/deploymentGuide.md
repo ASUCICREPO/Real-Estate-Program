@@ -101,26 +101,19 @@ aws amplify start-deployment \
 
 Before running `deploy.sh`, complete these one-time account-level steps:
 
-### 1. Enable Bedrock Model Access (us-east-1)
+### 1. Bedrock Model Access (us-east-1)
 
-Open the [Bedrock Model Access console](https://us-east-1.console.aws.amazon.com/bedrock/home#/modelaccess) and enable all four models:
+Amazon Nova models (Nova 2 Sonic, Nova Lite) auto-enable on first invocation — no action needed.
 
-| Model | Used For |
-|-------|---------|
-| Amazon Nova 2 Sonic | Live voice Q&A (AgentCore) |
-| Amazon Nova Lite | Q&A session analytics |
-| Anthropic Claude Haiku (latest cross-region) | Post-session written feedback |
-| Anthropic Claude 3.5 Haiku | PDF content analysis |
-
-> Access requests are usually approved within a few minutes. Deployment will fail if any of these are not enabled.
+For **Anthropic Claude** models (Claude Haiku 4.5, Claude 3.5 Haiku), first-time users may need to submit use case details before access is granted. Open the [Bedrock Model Catalog](https://us-east-1.console.aws.amazon.com/bedrock/home#/model-catalog), find Claude Haiku, and submit the request if prompted. This is usually approved within minutes.
 
 ### 2. Enable Bedrock AgentCore
 
 Bedrock AgentCore must be activated in your account before the AgentCore CDK stack can deploy. In the AWS Console, navigate to **Amazon Bedrock → AgentCore** and follow the one-time activation prompt if present.
 
-### 3. Get an Anam AI API Key
+### 3. Get an Anam AI API Key (optional)
 
-The `deploy.sh` script will prompt you for this. Get it from [app.anam.ai](https://app.anam.ai) → Account Settings → API Keys. Default persona IDs are pre-filled in the script — press Enter to use them unless you have your own Anam account with different personas.
+The `deploy.sh` script will prompt you for this. Get it from [app.anam.ai](https://app.anam.ai) → Account Settings → API Keys. Press Enter to skip — voice Q&A works without avatars, just no visual face.
 
 ---
 

@@ -66,15 +66,11 @@ For complete deployment instructions, see the [Deployment Guide](./docs/deployme
 
 ### Prerequisites (complete before deploying)
 
-1. **Enable Bedrock Model Access** in us-east-1 — [open console](https://us-east-1.console.aws.amazon.com/bedrock/home#/modelaccess):
-   - Amazon Nova 2 Sonic (live voice Q&A)
-   - Amazon Nova Lite (Q&A analytics)
-   - Anthropic Claude Haiku 4.5 (post-session feedback)
-   - Anthropic Claude 3.5 Haiku (PDF content analysis)
+1. **Bedrock models** — Amazon Nova models auto-enable on first invocation. For **Anthropic Claude** models, first-time users may need to submit use case details in the [Bedrock Model Catalog](https://us-east-1.console.aws.amazon.com/bedrock/home#/model-catalog) before access is granted.
 
 2. **Enable Bedrock AgentCore** — navigate to Amazon Bedrock → AgentCore in the AWS Console and complete the one-time activation.
 
-3. **Get an Anam AI API key** — sign up at [app.anam.ai](https://app.anam.ai) → Account Settings → API Keys.
+3. **Anam AI API key** (optional) — sign up at [app.anam.ai](https://app.anam.ai) → Account Settings → API Keys. Press Enter during deploy to skip — voice Q&A still works without avatars.
 
 ### Quick Start (CloudShell — no local tooling needed)
 
