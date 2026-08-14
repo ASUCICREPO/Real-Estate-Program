@@ -138,11 +138,9 @@ function SinglePersonaSession({
   }, [qa.status]);
 
   // Auto-start the Nova Sonic QA session when avatar is being used
-  useEffect(() => {
-    if (anamPersonaId && qa.status === 'idle') {
-      qa.startSession();
-    }
-  }, [anamPersonaId, qa.status, qa.startSession]);
+  // REMOVED: Previously auto-started when anamPersonaId was set.
+  // Now both avatar and non-avatar modes require explicit user action to start.
+  // The QAOrbPanel has a Start button; AnamAvatarPanel starts via the same button below.
 
   useEffect(() => {
     if (qa.status === 'ended' && !autoNavigatedRef.current) {
@@ -226,7 +224,32 @@ function SinglePersonaSession({
 
         {/* Right: Avatar or Orb panel with controls */}
         <div className="min-w-0" style={{ flex: '1 1 0%' }}>
-          {anamPersonaId ? (
+          {qa.status === 'idle' ? (
+            // Pre-session: Show Start and Skip buttons
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+              <div className="text-center mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 font-serif mb-2">Ready for Q&A?</h3>
+                <p className="text-sm text-gray-500 font-sans">
+                  {displayPersonaName} will ask you questions about your presentation.
+                  {anamPersonaId ? ' An AI avatar will represent the persona.' : ''}
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <button
+                  onClick={qa.startSession}
+                  className="w-full rounded-full bg-maroon px-6 py-3 text-base font-medium text-white shadow-md hover:bg-maroon-dark transition-all font-sans"
+                >
+                  Start Q&A Session
+                </button>
+                <button
+                  onClick={onSkip}
+                  className="w-full rounded-full border border-gray-300 px-6 py-3 text-base font-medium text-gray-600 hover:bg-gray-50 transition-all font-sans"
+                >
+                  Skip Q&A
+                </button>
+              </div>
+            </div>
+          ) : anamPersonaId ? (
             <AnamAvatarPanel
               anamPersonaId={anamPersonaId}
               sessionToken={anamSessionToken}

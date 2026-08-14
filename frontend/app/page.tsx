@@ -133,6 +133,11 @@ export default function Home() {
   const handlePracticeComplete = (data: SessionAnalytics, promise: Promise<AIFeedbackResponse | null>) => {
     setSessionData(data);
     analyticsPromiseRef.current = promise;
+    // Clear any leftover QA analytics from previous sessions
+    setQaAnalytics(null);
+    setMultiPersonaQA(null);
+    didQASessionRef.current = false;
+    qaAnalyticsPromiseRef.current = null;
     setCurrentStep(4);
     window.scrollTo({ top: 0 });
   };
