@@ -103,6 +103,7 @@ phases:
           echo "NEXT_PUBLIC_API_BASE_URL=$BARE_API_URL" >> .env.local
           echo "NEXT_PUBLIC_WEBSOCKET_API_URL=$BARE_WEBSOCKET_URL" >> .env.local
           echo "Installing frontend dependencies..."
+          rm -f package-lock.json
           npm install
           echo "Building Next.js static export..."
           npm run build
