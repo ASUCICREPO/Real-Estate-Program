@@ -275,6 +275,13 @@ phases:
           echo "Deploying frontend to Amplify (artifact: $BUILD_ZIP)..."
           cd $CODEBUILD_SRC_DIR/frontend
 
+          # Ensure Amplify serves static files correctly (SPA rewrite rules)
+          echo "Setting Amplify custom rewrite rules..."
+          aws amplify update-app \
+            --app-id "$BARE_AMPLIFY_APP_ID" \
+            --custom-rules '[{"source":"</^[^.]+$|\\.((?!js|css|png|ico|woff2|json|txt|map$)[^.]+$)/>","target":"/index.html","status":"200"}]' \
+            --no-cli-pager > /dev/null 2>&1 || echo "  (rewrite rules may already be set via CDK)"
+
           echo "Cancelling any in-progress Amplify jobs..."
           ACTIVE_JOBS=$(aws amplify list-jobs \
             --app-id "$BARE_AMPLIFY_APP_ID" \

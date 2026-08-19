@@ -43,6 +43,16 @@ export class AmplifyHostingStack extends cdk.Stack {
                     repository: githubRepo!,
                     oauthToken: githubTokenSecret.secretValue,
                 }),
+                customRules: [
+                    // Serve static files directly (JS, CSS, images, etc.)
+                    { source: '/<*>.js', target: '/<*>.js', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.css', target: '/<*>.css', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.png', target: '/<*>.png', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.ico', target: '/<*>.ico', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.woff2', target: '/<*>.woff2', status: amplify.RedirectStatus.REWRITE },
+                    // SPA fallback — all other routes serve index.html
+                    { source: '</^[^.]+$|\.(?!(js|css|png|ico|woff2|json|txt|map)$)([^.]+$)/>', target: '/index.html', status: amplify.RedirectStatus.REWRITE },
+                ],
                 buildSpec: codebuild.BuildSpec.fromObjectToYaml({
                     version: '1.0',
                     applications: [
@@ -70,6 +80,16 @@ export class AmplifyHostingStack extends cdk.Stack {
                 appName: `real-estate-program-${branchName}`,
                 description: `Real Estate Program frontend (${branchName}) — manual deploy`,
                 platform: amplify.Platform.WEB,
+                customRules: [
+                    // Serve static files directly (JS, CSS, images, etc.)
+                    { source: '/<*>.js', target: '/<*>.js', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.css', target: '/<*>.css', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.png', target: '/<*>.png', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.ico', target: '/<*>.ico', status: amplify.RedirectStatus.REWRITE },
+                    { source: '/<*>.woff2', target: '/<*>.woff2', status: amplify.RedirectStatus.REWRITE },
+                    // SPA fallback — all other routes serve index.html
+                    { source: '</^[^.]+$|\.(?!(js|css|png|ico|woff2|json|txt|map)$)([^.]+$)/>', target: '/index.html', status: amplify.RedirectStatus.REWRITE },
+                ],
             });
         }
 
