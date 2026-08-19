@@ -105,13 +105,16 @@ function SinglePersonaSession({
   const displayPersonaName = qa.personaName || initialPersonaName;
 
   // Mute Nova Sonic audio playback when avatar is handling the voice
+  // Only mute if we have BOTH an anamPersonaId AND a valid session token (Anam connected)
   useEffect(() => {
-    if (anamPersonaId) {
+    if (anamPersonaId && anamSessionToken) {
       qa.setMuteAudioPlayback(true);
+    } else {
+      qa.setMuteAudioPlayback(false);
     }
     return () => { qa.setMuteAudioPlayback(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anamPersonaId]);
+  }, [anamPersonaId, anamSessionToken]);
 
   const remaining = Math.max(0, qaTimeLimitSec - qa.timer);
   const isWarning = remaining <= QA_SESSION_CONFIG.WARNING_AT_SEC;
