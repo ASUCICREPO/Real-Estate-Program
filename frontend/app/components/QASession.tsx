@@ -72,14 +72,22 @@ function SinglePersonaSession({
   const wasEverActiveRef = useRef(false);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const [anamSessionToken, setAnamSessionToken] = useState<string | null>(null);
+  const [anamFailed, setAnamFailed] = useState(false);
 
   // Fetch Anam session token if persona has an avatar
   useEffect(() => {
     if (!anamPersonaId) return;
+    setAnamFailed(false);
     getAnamSessionToken(anamPersonaId)
       .then(setAnamSessionToken)
-      .catch((err) => console.error('[Anam] Failed to get session token:', err));
+      .catch((err) => {
+        console.error('[Anam] Failed to get session token:', err);
+        setAnamFailed(true);
+      });
   }, [anamPersonaId]);
+
+  // Effective anam ID — null if Anam failed (fall back to orb)
+  const effectiveAnamId = anamFailed ? undefined : anamPersonaId;
 
   const dateStr = useMemo(() => {
     const now = new Date();
@@ -107,14 +115,14 @@ function SinglePersonaSession({
   // Mute Nova Sonic audio playback when avatar is handling the voice
   // Only mute if we have BOTH an anamPersonaId AND a valid session token (Anam connected)
   useEffect(() => {
-    if (anamPersonaId && anamSessionToken) {
+    if (effectiveAnamId && anamSessionToken) {
       qa.setMuteAudioPlayback(true);
     } else {
       qa.setMuteAudioPlayback(false);
     }
     return () => { qa.setMuteAudioPlayback(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anamPersonaId, anamSessionToken]);
+  }, [effectiveAnamId, anamSessionToken]);
 
   const remaining = Math.max(0, qaTimeLimitSec - qa.timer);
   const isWarning = remaining <= QA_SESSION_CONFIG.WARNING_AT_SEC;
@@ -234,7 +242,7 @@ function SinglePersonaSession({
                 <h3 className="text-lg font-semibold text-gray-900 font-serif mb-2">Ready for Q&A?</h3>
                 <p className="text-sm text-gray-500 font-sans">
                   {displayPersonaName} will ask you questions about your presentation.
-                  {anamPersonaId ? ' An AI avatar will represent the persona.' : ''}
+                  {effectiveAnamId ? ' An AI avatar will represent the persona.' : ''}
                 </p>
               </div>
               <div className="flex flex-col gap-3 w-full max-w-xs">
@@ -252,9 +260,9 @@ function SinglePersonaSession({
                 </button>
               </div>
             </div>
-          ) : anamPersonaId ? (
+          ) : effectiveAnamId ? (
             <AnamAvatarPanel
-              anamPersonaId={anamPersonaId}
+              anamPersonaId={effectiveAnamId}
               sessionToken={anamSessionToken}
               isActive={qa.status === 'active'}
               isMuted={qa.isMuted}
