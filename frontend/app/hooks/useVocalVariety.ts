@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
+import { getAudioWorkletUrl } from '../utils/audioWorkletLoader';
 
 export interface VocalVarietyMetrics {
     pitchVariation: number;
@@ -80,7 +81,7 @@ export function useVocalVariety() {
             const source = audioContext.createMediaStreamSource(stream);
 
             // Load the audio worklet
-            await audioContext.audioWorklet.addModule('/audio-capture-processor.js');
+            await audioContext.audioWorklet.addModule(getAudioWorkletUrl());
 
             // Create worklet node
             const workletNode = new AudioWorkletNode(audioContext, 'audio-capture-processor');

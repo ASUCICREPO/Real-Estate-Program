@@ -17,6 +17,7 @@ import type { TranscriptionProvider, TranscriptionCallbacks } from './types';
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from '@aws-sdk/client-transcribe-streaming';
 import { fromCognitoIdentityPool } from '@aws-sdk/credential-providers';
 import { cognitoConfig, AUDIO_ANALYSIS_CONFIG } from '../config/config';
+import { getAudioWorkletUrl } from '../utils/audioWorkletLoader';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export function createAwsTranscribeProvider(
     }
 
     const source = audioCtx.createMediaStreamSource(mediaStream!);
-    await audioCtx.audioWorklet.addModule('/audio-capture-processor.js');
+    await audioCtx.audioWorklet.addModule(getAudioWorkletUrl());
     workletNode = new AudioWorkletNode(audioCtx, 'audio-capture-processor');
     source.connect(workletNode);
     workletNode.connect(audioCtx.destination);

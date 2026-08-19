@@ -5,6 +5,7 @@ import { AUDIO_ANALYSIS_CONFIG } from '../config/config';
 import { createTranscriptionProvider } from '../transcription';
 import type { TranscriptionProvider } from '../transcription';
 import { useAuth } from '../context/AuthContext';
+import { getAudioWorkletUrl } from '../utils/audioWorkletLoader';
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface AudioMetrics {
@@ -267,7 +268,7 @@ export function useAudioAnalysis(): AudioAnalysisReturn {
       }
 
       const source = audioCtx.createMediaStreamSource(stream);
-      await audioCtx.audioWorklet.addModule('/audio-capture-processor.js');
+      await audioCtx.audioWorklet.addModule(getAudioWorkletUrl());
       const workletNode = new AudioWorkletNode(audioCtx, 'audio-capture-processor');
       workletNodeRef.current = workletNode;
       source.connect(workletNode);

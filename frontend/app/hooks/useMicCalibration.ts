@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { getAudioWorkletUrl } from '../utils/audioWorkletLoader';
 
 const WORKLET_SAMPLE_RATE = 16000;
 const EMA_ALPHA = 0.3;
@@ -79,7 +80,7 @@ export function useMicCalibration(): MicCalibrationReturn {
             if (audioCtx.state === 'suspended') await audioCtx.resume();
 
             const source = audioCtx.createMediaStreamSource(stream);
-            await audioCtx.audioWorklet.addModule('/audio-capture-processor.js');
+            await audioCtx.audioWorklet.addModule(getAudioWorkletUrl());
             const worklet = new AudioWorkletNode(audioCtx, 'audio-capture-processor');
             workletRef.current = worklet;
 
