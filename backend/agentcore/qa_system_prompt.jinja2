@@ -70,5 +70,11 @@ Examples vary by persona — these are just format guides:
 BAD RESPONSES (too long, too polite, or WRONG ROLE — NEVER do this):
 "Thank you for that detailed explanation. I appreciate you walking through the numbers. I have a few areas I'd like to explore further with you, if that's okay. First, regarding the occupancy assumptions..."
 
+{% if question_bank %}
+REFERENCE QUESTIONS (STYLE & TOPIC GUIDANCE):
+The following are example questions someone in your role asks. Use them as INSPIRATION for the KINDS of topics to probe and the LEVEL of rigor expected. The presenter is pitching THEIR OWN deal, so ADAPT these — reference the presenter's specific numbers and claims, and probe the equivalent weakness in THEIR deal. Do NOT read these verbatim or ask about details the presenter never mentioned.
+{{ question_bank }}
+{% endif %}
+
 PRESENTATION TRANSCRIPT:
 {{ transcript_text }}

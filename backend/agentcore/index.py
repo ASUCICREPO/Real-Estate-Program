@@ -85,6 +85,23 @@ async def apply_guardrail_to_text(text: str, source: Literal['INPUT', 'OUTPUT'])
 
 # ── System prompt builder ────────────────────────────────────────────
 
+def load_question_bank(persona_name: str) -> str | None:
+    """Load a persona-specific reference question bank, if one exists.
+
+    Currently only the Investor persona has a curated bank. Matched by
+    case-insensitive substring on the persona name so it works regardless of
+    the persona's UUID.
+    """
+    if not persona_name or "investor" not in persona_name.lower():
+        return None
+    try:
+        with open("investor_questions.md", "r") as f:
+            return f.read()
+    except OSError as e:
+        print(f"[QuestionBank] Could not load investor_questions.md: {e}", flush=True)
+        return None
+
+
 def build_qa_system_prompt(persona_name, persona_prompt, custom_instructions, transcript_text, session_duration, previous_qa_context=None):
     """Build QA system prompt from persona and presentation context."""
     qa_duration = session_duration // 60
@@ -103,12 +120,15 @@ def build_qa_system_prompt(persona_name, persona_prompt, custom_instructions, tr
             + previous_qa_context
         )
 
+    question_bank = load_question_bank(persona_name)
+
     prompt = template.render(
         persona_name=persona_name,
         persona_prompt=persona_prompt,
         custom_instructions=full_custom_instructions if full_custom_instructions else None,
         transcript_text=transcript_text,
         qa_limit=qa_duration,
+        question_bank=question_bank,
     )
     return prompt
 
